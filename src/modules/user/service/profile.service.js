@@ -4,14 +4,14 @@ import Usermodel from "../../../DB/models/User.model.js";
 import { successresponse } from "../../../utlis/response/success.response.js";
 import { comparehash, decryptData, encryptData, generatehash } from "../../../utlis/security/hash.security.js";
 import cloud from "../../../utlis/multer/cloudinary.js";
-import { Folder } from "../../../DB/models/foldeer.model.js";
-import File from "../../../DB/models/files.conrroller.js";
+// import { Folder } from "../../../DB/models/foldeer.model.js";
+// import File from "../../../DB/models/files.conrroller.js";
 import fs from 'fs';
 import admin from 'firebase-admin';
 
 import axios from 'axios';
 
-import { NotificationModel } from "../../../DB/models/points.model.js";
+// import { NotificationModel } from "../../../DB/models/points.model.js";
 
 export const Updateuseraccount = asyncHandelr(async (req, res, next) => {
     const {

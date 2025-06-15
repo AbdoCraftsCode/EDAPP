@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, createClass, generateShareLink,createFile, createImages, createSupject, getAllClasses, getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile, getSubjectsByClass, getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { forgetpassword,   login, loginwithGmail, refreshToken, resetpassword } from "./service/authontecation.service.js";
+import { createChapter, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getLessonsByChapter,   login, loginwithGmail, refreshToken, resetpassword, uploadLessonResource } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findonechat } from "../chat/chat/chat.service.js";
@@ -32,7 +32,24 @@ routr.post(
     createFile
 );
 
+
+
+routr.post(
+    "/uploadLessonResource",
+    authentication(),
+    uploadCloudFile([
+        ...fileValidationTypes.video,
+        ...fileValidationTypes.document, // تضم PDF
+    ]).single("file"),
+   uploadLessonResource
+);
+  
+
+
 routr.post("/resendOTP", resendOTP)
+
+routr.post("/createChapter", authentication(), createChapter)
+routr.post("/createLesson",authentication() ,createLesson)
 
 routr.patch("/updateProfile", authentication(), updateProfile)
 routr.delete("/deleteFile/:fileId", authentication(), deleteFile)
@@ -45,6 +62,9 @@ routr.post("/generateShareLink",authentication(), generateShareLink)
 
 routr.get("/getShareLinkAnalytics", authentication(), getShareLinkAnalytics)
 
+routr.get("/getAllChapters", getAllChapters)
+routr.get("/getAllLessons", getAllLessons)
+routr.get("/getLessonsByChapter/:chapterId", getLessonsByChapter)
 routr.get("/getUserAnalytics", authentication(), getUserAnalytics)
 routr.get("/getUserRoleById/:_id", getUserRoleById)
 routr.get("/getSharedFile/:fileId" ,getSharedFile)

@@ -8,6 +8,11 @@ import { Emailevent } from "../../../utlis/events/email.emit.js";
 import { OAuth2Client } from "google-auth-library";
 import axios from 'axios';
 import { nanoid } from 'nanoid';
+import chapterModel from "../../../DB/models/chapter.model.js";
+import lessonModel from "../../../DB/models/lesson.model.js";
+import { LessonResourceModel } from "../../../DB/models/videos.model.js";
+import cloud from "../../../utlis/multer/cloudinary.js"
+import fs from 'fs';
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -258,3 +263,176 @@ export const resetpassword = asyncHandelr(async (req, res, next) => {
 
 
 
+
+export const createChapter = async (req, res) => {
+    try {
+        const { title, description } = req.body;
+        const userId = req.user._id;
+
+        const chapter = await chapterModel.create({
+            title,
+            description,
+            createdBy: userId
+        });
+
+        res.status(201).json({ message: "✅ تم إنشاء الفصل بنجاح", chapter });
+    } catch (error) {
+        res.status(500).json({ message: "❌ خطأ أثناء إنشاء الفصل", error: error.message });
+    }
+};
+  
+
+export const createLesson = async (req, res) => {
+    try {
+        const { title, description, chapterId } = req.body;
+        const userId = req.user._id;
+
+        const lesson = await lessonModel.create({
+            title,
+            description,
+            chapterId,
+            createdBy: userId
+        });
+
+        res.status(201).json({ message: "✅ تم إنشاء الدرس بنجاح", lesson });
+    } catch (error) {
+        res.status(500).json({ message: "❌ خطأ أثناء إنشاء الدرس", error: error.message });
+    }
+  }
+
+
+export const uploadLessonResource = async (req, res) => {
+    try {
+        const { lessonId, description = "" } = req.body;
+        const file = req.file;
+        const userId = req.user._id;
+
+        if (!file) {
+            return res.status(400).json({ message: "❌ يرجى رفع ملف." });
+        }
+
+        // تحديد نوع المورد المناسب
+        let resourceType = "raw";
+        if (file.mimetype.startsWith("video/")) resourceType = "video";
+        else if (file.mimetype === "application/pdf") resourceType = "raw";
+        else {
+            return res.status(400).json({ message: "❌ مسموح فقط بالفيديوهات أو PDF." });
+        }
+
+        // رفع على Cloudinary
+        const result = await cloud.uploader.upload(file.path, {
+            resource_type: resourceType,
+            folder: "edapp/lessons",
+            use_filename: true,
+            unique_filename: false,
+        });
+
+        const fileSizeMB = Math.ceil(file.size / (1024 * 1024));
+
+        const resource = await LessonResourceModel.create({
+            lessonId,
+            uploadedBy: userId,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            fileSize: fileSizeMB,
+            url: result.secure_url,
+            description,
+        });
+
+        fs.unlinkSync(file.path); // حذف الملف من السيرفر
+
+        res.status(201).json({
+            message: "✅ تم رفع الملف بنجاح",
+            resource,
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            message: "❌ خطأ أثناء رفع الملف",
+            error: err.message,
+        });
+    }
+};
+
+// GET /chapters
+export const getAllChapters = async (req, res) => {
+    try {
+        const chapters = await chapterModel.find().sort({ createdAt: -1 });
+        res.status(200).json({ message: "✅ قائمة الفصول", chapters });
+    } catch (error) {
+        res.status(500).json({ message: "❌ خطأ أثناء جلب الفصول", error: error.message });
+    }
+};
+  
+// GET /chapters/:chapterId/lessons
+export const getLessonsByChapter = async (req, res) => {
+    try {
+        const { chapterId } = req.params;
+
+        // جلب الدروس المرتبطة بالفصل
+        const lessons = await lessonModel.find({ chapterId });
+
+        // لكل درس، نجيب الملفات المرتبطة بيه (PDF أو فيديو)
+        const populatedLessons = await Promise.all(
+            lessons.map(async (lesson) => {
+                const resources = await  LessonResourceModel.find({ lessonId: lesson._id });
+
+                return {
+                    _id: lesson._id,
+                    title: lesson.title,
+                    description: lesson.description,
+                    files: resources.map((res) => ({
+                        type: res.fileType.startsWith("video") ? "video" : "pdf",
+                        url: res.url,
+                        description: res.description,
+                        fileName: res.fileName,
+                        fileSize: res.fileSize,
+                    })),
+                };
+            })
+        );
+
+        res.status(200).json({ message: "✅ الدروس والملفات", lessons: populatedLessons });
+    } catch (error) {
+        res.status(500).json({ message: "❌ خطأ أثناء جلب الدروس", error: error.message });
+    }
+};
+
+
+// GET /lessons
+export const getAllLessons = async (req, res) => {
+    try {
+        const lessons = await lessonModel.find().sort({ createdAt: -1 });
+
+        const fullLessons = await Promise.all(
+            lessons.map(async (lesson) => {
+                const resources = await LessonResourceModel.find({ lessonId: lesson._id });
+
+                return {
+                    _id: lesson._id,
+                    title: lesson.title,
+                    description: lesson.description,
+                    chapterId: lesson.chapterId,
+                    createdBy: lesson.createdBy,
+                    files: resources.map((file) => ({
+                        type: file.fileType.startsWith("video") ? "video" : "pdf",
+                        url: file.url,
+                        description: file.description,
+                        fileName: file.fileName,
+                        fileSize: file.fileSize,
+                    })),
+                };
+            })
+        );
+
+        res.status(200).json({ message: "✅ تم جلب كل الدروس", lessons: fullLessons });
+    } catch (error) {
+        res.status(500).json({
+            message: "❌ خطأ أثناء جلب الدروس",
+            error: error.message,
+        });
+    }
+};
+  
+  
