@@ -286,11 +286,12 @@ export const createChapter = async (req, res) => {
 
 export const createLesson = async (req, res) => {
     try {
-        const { title, description, chapterId } = req.body;
+        const { title, description, chapterId, content } = req.body;
         const userId = req.user._id;
 
         const lesson = await lessonModel.create({
             title,
+            content,
             description,
             chapterId,
             createdBy: userId

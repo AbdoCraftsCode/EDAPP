@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const lessonSchema = new mongoose.Schema({
     title: { type: String, required: true },
+    content: { type: String,  },
     lessonImage: {
         secure_url: String,
         public_id: String,
