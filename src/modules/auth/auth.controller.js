@@ -39,10 +39,19 @@ routr.post(
     authentication(),
     uploadCloudFile([
         ...fileValidationTypes.video,
-        ...fileValidationTypes.document, // تضم PDF
-    ]).single("file"),
-   uploadLessonResource
+        ...fileValidationTypes.document,
+    ]).fields([
+        { name: "video", maxCount: 1 },
+        { name: "document", maxCount: 1 },
+    ]),
+    (req, res, next) => {
+        // تحديد الملف المرفوع سواء فيديو أو PDF
+        req.file = req.files.video?.[0] || req.files.document?.[0];
+        next();
+    },
+    uploadLessonResource
 );
+  
   
 routr.patch("/updateLessonImage",
     uploadCloudFile(fileValidationTypes.image).single("image"), authentication(), updateLessonImage);
