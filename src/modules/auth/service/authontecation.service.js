@@ -462,6 +462,7 @@ export const getAllLessons = async (req, res) => {
                 return {
                     _id: lesson._id,
                     title: lesson.title,
+                    content: lesson.content,
                     description: lesson.description,
                     chapterId: lesson.chapterId,
                     createdBy: lesson.createdBy,
@@ -518,8 +519,10 @@ export const getExamQuestions = async (req, res) => {
             _id: q._id,
             question: q.question,
             options: q.options,
+            correctAnswer: q.correctAnswer,
             mark: q.mark
         }));
+        
 
         res.status(200).json({ questions });
     } catch (err) {
