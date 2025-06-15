@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, createClass, generateShareLink,createFile, createImages, createSupject, getAllClasses, getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile, getSubjectsByClass, getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { createChapter, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getLessonsByChapter,   login, loginwithGmail, refreshToken, resetpassword, uploadLessonResource } from "./service/authontecation.service.js";
+import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadLessonResource } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findonechat } from "../chat/chat/chat.service.js";
@@ -44,6 +44,8 @@ routr.post(
    uploadLessonResource
 );
   
+routr.patch("/updateLessonImage",
+    uploadCloudFile(fileValidationTypes.image).single("image"), authentication(), updateLessonImage);
 
 
 routr.post("/resendOTP", resendOTP)
@@ -66,11 +68,20 @@ routr.get("/getAllChapters", getAllChapters)
 routr.get("/getAllLessons", getAllLessons)
 routr.get("/getLessonsByChapter/:chapterId", getLessonsByChapter)
 routr.get("/getUserAnalytics", authentication(), getUserAnalytics)
+
+routr.post("/createExam", authentication(), createExam)
+
+routr.post("/submitExam", authentication(), submitExam)
+routr.get("/getResultByLesson/:lessonId", authentication(), getResultByLesson)
+routr.get("/getMyExamResults", authentication(), getMyExamResults)
+routr.get("/getExamQuestions/:lessonId",  getExamQuestions)
 routr.get("/getUserRoleById/:_id", getUserRoleById)
 routr.get("/getSharedFile/:fileId" ,getSharedFile)
 routr.post("/addQuestion", addQuestion)
 routr.post("/submitAnswer", authentication(), submitAnswer)
 routr.get("/getMyRank", authentication(), getMyRank)
+routr.get("/getTopStudentsOverall", getTopStudentsOverall)
+
 routr.get("/getUserFiles", authentication(), getUserFiles)
 routr.get("/getUserStorageUsage", authentication(), getUserStorageUsage)
 routr.get("/findonechat/:destId", authentication(), findonechat)

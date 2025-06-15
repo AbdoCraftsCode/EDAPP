@@ -13,6 +13,8 @@ import lessonModel from "../../../DB/models/lesson.model.js";
 import { LessonResourceModel } from "../../../DB/models/videos.model.js";
 import cloud from "../../../utlis/multer/cloudinary.js"
 import fs from 'fs';
+import ExamModel from "../../../DB/models/exams.model.js";
+import examresultModel from "../../../DB/models/examresult.model.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -298,7 +300,54 @@ export const createLesson = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "❌ خطأ أثناء إنشاء الدرس", error: error.message });
     }
-  }
+}
+  
+
+
+
+export const updateLessonImage = asyncHandelr(async (req, res) => {
+    const { lessonId } = req.body;
+
+    // رفع الصورة الجديدة على Cloudinary
+    const { secure_url, public_id } = await cloud.uploader.upload(req.file.path, {
+        folder: `lessons/${lessonId}`,
+    });
+
+    // جلب بيانات الدرس الحالي
+    const lesson = await dbservice.findOne({
+        model: lessonModel,
+        filter: { _id: lessonId },
+    });
+
+    // حذف الصورة القديمة إن وجدت
+    if (lesson?.lessonImage?.public_id) {
+        try {
+            await cloud.uploader.destroy(lesson.lessonImage.public_id);
+        } catch (err) {
+            console.error("❌ خطأ في حذف الصورة القديمة:", err.message);
+        }
+    }
+
+    // تحديث الدرس بالصورة الجديدة
+    const updatedLesson = await dbservice.findOneAndUpdate({
+        model: lessonModel,
+        filter: { _id: lessonId },
+        data: {
+            lessonImage: { secure_url, public_id }
+        },
+        options: { new: true },
+    });
+
+    fs.unlinkSync(req.file.path); // حذف الصورة من السيرفر
+
+    return successresponse(res, "✅ تم تحديث صورة الدرس بنجاح", 200, {
+        lesson: updatedLesson,
+    });
+});
+
+
+
+
 
 
 export const uploadLessonResource = async (req, res) => {
@@ -415,6 +464,7 @@ export const getAllLessons = async (req, res) => {
                     description: lesson.description,
                     chapterId: lesson.chapterId,
                     createdBy: lesson.createdBy,
+                    lessonImage: lesson.lessonImage || null, // ✅ الصورة
                     files: resources.map((file) => ({
                         type: file.fileType.startsWith("video") ? "video" : "pdf",
                         url: file.url,
@@ -434,5 +484,223 @@ export const getAllLessons = async (req, res) => {
         });
     }
 };
+
+
+export const createExam = async (req, res) => {
+    try {
+        const { lessonId, questions } = req.body;
+        const userId = req.user._id;
+
+        const exam = await ExamModel.create({
+            lessonId,
+            questions,
+            createdBy: userId,
+        });
+
+        res.status(201).json({ message: "✅ تم إنشاء الامتحان بنجاح", exam });
+    } catch (err) {
+        res.status(500).json({ message: "❌ فشل في إنشاء الامتحان", error: err.message });
+    }
+};
+  
+export const getExamQuestions = async (req, res) => {
+    try {
+        const { lessonId } = req.params;
+
+        const exam = await ExamModel.findOne({ lessonId });
+
+        if (!exam) {
+            return res.status(404).json({ message: "❌ لا يوجد امتحان لهذا الدرس" });
+        }
+
+        const questions = exam.questions.map(q => ({
+            _id: q._id,
+            question: q.question,
+            options: q.options,
+            mark: q.mark
+        }));
+
+        res.status(200).json({ questions });
+    } catch (err) {
+        res.status(500).json({ message: "❌ فشل في جلب الأسئلة", error: err.message });
+    }
+};
+  
+
+export const submitExam = async (req, res) => {
+    try {
+        const { lessonId, answers } = req.body;
+        const studentId = req.user._id;
+
+        const exam = await ExamModel.findOne({ lessonId });
+        if (!exam) {
+            return res.status(404).json({ message: "❌ لم يتم العثور على الامتحان لهذا الدرس" });
+        }
+
+        let totalScore = 0;
+        let maxScore = 0;
+        const result = [];
+
+        for (const answer of answers) {
+            const question = exam.questions.find(q => q._id.toString() === answer.questionId);
+            if (!question) continue;
+
+            const isCorrect = answer.selectedAnswer === question.correctAnswer;
+            if (isCorrect) totalScore += question.mark;
+            maxScore += question.mark;
+
+            result.push({
+                questionId: question._id,
+                selectedAnswer: answer.selectedAnswer || null,
+                correctAnswer: question.correctAnswer,
+                isCorrect,
+                mark: question.mark
+            });
+        }
+
+        const savedResult = await examresultModel.create({
+            studentId,
+            lessonId,
+            totalScore,
+            maxScore,
+            answers: result
+        });
+
+        res.status(201).json({
+            message: "✅ تم تصحيح وحفظ الامتحان",
+            totalScore,
+            maxScore,
+            result,
+            savedResult
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            message: "❌ حدث خطأ أثناء حفظ نتيجة الامتحان",
+            error: err.message
+        });
+    }
+};
+
+
+export const getMyExamResults = async (req, res) => {
+    try {
+        const studentId = req.user._id;
+
+        const results = await examresultModel.find({ studentId })
+            .populate({
+                path: "lessonId",
+                select: "title"
+            })
+            .sort({ createdAt: -1 });
+
+        const formattedResults = results.map(result => ({
+            lessonTitle: result.lessonId?.title || "غير معروف",
+            totalScore: result.totalScore,
+            maxScore: result.maxScore,
+            questionsCount: result.answers.length,
+            percentage: `${Math.round((result.totalScore / result.maxScore) * 100)}%`,
+            createdAt: result.createdAt
+        }));
+
+        res.status(200).json({
+            message: "✅ تم جلب نتائج الطالب",
+            count: formattedResults.length,
+            results: formattedResults
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            message: "❌ حدث خطأ أثناء جلب النتائج",
+            error: err.message
+        });
+    }
+};
+  
+export const getResultByLesson = async (req, res) => {
+    try {
+        const studentId = req.user._id;
+        const { lessonId } = req.params;
+
+        const result = await examresultModel.findOne({ studentId, lessonId })
+            .populate({
+                path: "lessonId",
+                select: "title"
+            });
+
+        if (!result) {
+            return res.status(404).json({ message: "❌ لا يوجد نتيجة لهذا الدرس" });
+        }
+
+        res.status(200).json({
+            message: "✅ تم جلب نتيجة الدرس",
+            lessonTitle: result.lessonId?.title || "غير معروف",
+            totalScore: result.totalScore,
+            maxScore: result.maxScore,
+            percentage: `${Math.round((result.totalScore / result.maxScore) * 100)}%`,
+            questionsCount: result.answers.length,
+            answers: result.answers,
+            createdAt: result.createdAt
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء جلب النتيجة", error: err.message });
+    }
+};
+  
+export const getTopStudentsOverall = async (req, res) => {
+    try {
+        const results = await examresultModel.aggregate([
+            {
+                $group: {
+                    _id: "$studentId",
+                    totalScore: { $sum: "$totalScore" },
+                    maxScore: { $sum: "$maxScore" },
+                    examsCount: { $sum: 1 }
+                }
+            },
+            {
+                $addFields: {
+                    percentage: {
+                        $cond: [
+                            { $eq: ["$maxScore", 0] },
+                            0,
+                            { $multiply: [{ $divide: ["$totalScore", "$maxScore"] }, 100] }
+                        ]
+                    }
+                }
+            },
+            { $sort: { totalScore: -1 } },
+            { $limit: 10 }
+        ]);
+
+        // جلب أسماء الطلاب
+        const populated = await Promise.all(
+            results.map(async (r) => {
+                const user = await Usermodel.findById(r._id).select("username email");
+                return {
+                    studentName: user?.username || "مجهول",
+                    studentEmail: user?.email || "",
+                    totalScore: r.totalScore,
+                    maxScore: r.maxScore,
+                    percentage: `${Math.round(r.percentage)}%`,
+                    examsCount: r.examsCount
+                };
+            })
+        );
+
+        res.status(200).json({
+            message: "✅ تم جلب أوائل الطلاب بشكل عام",
+            topStudents: populated
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء جلب الأوائل", error: err.message });
+    }
+  };
+
   
   
