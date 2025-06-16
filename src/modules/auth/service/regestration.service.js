@@ -112,7 +112,7 @@ export const createFile = async (req, res) => {
         if (file.mimetype.startsWith("image/")) resourceType = "image";
         else if (file.mimetype.startsWith("video/")) resourceType = "video";
 
-        // رفع الملف إلى Cloudinary
+      
         const result = await cloud.uploader.upload(file.path, {
             resource_type: resourceType,
             folder: "cloudbox",

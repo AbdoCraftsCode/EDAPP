@@ -5,7 +5,7 @@ import { addQuestion, adduser, confirmOTP, createClass, generateShareLink,create
 import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadLessonResource } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
-import { findonechat } from "../chat/chat/chat.service.js";
+import { findGroupChat } from "../chat/chat/chat.service.js";
 
 const routr = Router()
 
@@ -93,7 +93,7 @@ routr.get("/getTopStudentsOverall", getTopStudentsOverall)
 
 routr.get("/getUserFiles", authentication(), getUserFiles)
 routr.get("/getUserStorageUsage", authentication(), getUserStorageUsage)
-routr.get("/findonechat/:destId", authentication(), findonechat)
+routr.get("/findGroupChat", authentication(), findGroupChat)
 routr.get("/GetFriendsList", authentication(),GetFriendsList)
 routr.post("/signupwithGmail", signupwithGmail)
 routr.post("/adduser/:friendId", authentication(),adduser)
