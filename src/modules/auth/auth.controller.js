@@ -93,7 +93,7 @@ routr.get("/getTopStudentsOverall", getTopStudentsOverall)
 
 routr.get("/getUserFiles", authentication(), getUserFiles)
 routr.get("/getUserStorageUsage", authentication(), getUserStorageUsage)
-routr.get("/findGroupChat", authentication(), findGroupChat)
+routr.get("/findGroupChat",  findGroupChat)
 routr.get("/GetFriendsList", authentication(),GetFriendsList)
 routr.post("/signupwithGmail", signupwithGmail)
 routr.post("/adduser/:friendId", authentication(),adduser)
