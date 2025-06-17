@@ -35,11 +35,13 @@ import multer from "multer";
 export const fileValidationTypes = {
     image: ['image/jpg', 'image/jpeg', 'image/png', 'image/gif'],
     video: ['video/mp4', 'video/mpeg', 'video/x-msvideo'],
+    audio: ['audio/aac', 'audio/mpeg', 'audio/wav', 'audio/mp3'],
     document: ['application/json', 'application/pdf', 'application/zip', 'application/x-zip-compressed'],
     any: [
         'image/jpg', 'image/jpeg', 'image/png', 'image/gif',
         'video/mp4', 'video/mpeg', 'video/x-msvideo',
         'application/json', 'application/pdf',
+        'audio/aac', 'audio/mpeg', 'audio/wav', 'audio/mp3',
         'application/zip', 'application/x-zip-compressed'
     ]
 };

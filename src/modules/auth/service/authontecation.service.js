@@ -707,4 +707,38 @@ export const getTopStudentsOverall = async (req, res) => {
   };
 
   
-  
+export const uploadChatAttachment = asyncHandelr(async (req, res) => {
+    const file = req.file;
+    const userId = req.user._id;
+
+    if (!file) {
+        return res.status(400).json({ message: "❌ يجب رفع ملف." });
+    }
+
+    let resourceType = "raw";
+    let folder = "edapp/chat/files";
+
+    if (file.mimetype.startsWith("image/")) {
+        resourceType = "image";
+        folder = "edapp/chat/images";
+    } else if (file.mimetype.startsWith("audio/") || file.mimetype.startsWith("video/")) {
+        resourceType = "video";
+        folder = "edapp/chat/voices";
+    }
+
+    const result = await cloud.uploader.upload(file.path, {
+        resource_type: resourceType,
+        folder,
+        use_filename: true,
+        unique_filename: false
+    });
+
+    fs.unlinkSync(file.path);
+
+    res.status(201).json({
+        message: "✅ تم رفع الملف بنجاح",
+        url: result.secure_url,
+        type: file.mimetype,
+        public_id: result.public_id
+    });
+});

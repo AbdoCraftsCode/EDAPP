@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, createClass, generateShareLink,createFile, createImages, createSupject, getAllClasses, getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile, getSubjectsByClass, getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadLessonResource } from "./service/authontecation.service.js";
+import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadChatAttachment, uploadLessonResource } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat } from "../chat/chat/chat.service.js";
@@ -55,8 +55,30 @@ routr.post(
 );
   
   
-routr.patch("/updateLessonImage",
-    uploadCloudFile(fileValidationTypes.image).single("image"), authentication(), updateLessonImage);
+routr.post(
+    "/uploadChatAttachment",
+    authentication(),
+    uploadCloudFile([
+        ...fileValidationTypes.image,
+        ...fileValidationTypes.audio,
+        ...fileValidationTypes.video,
+        ...fileValidationTypes.document,
+    ]).fields([
+        { name: "file", maxCount: 1 }, // تسمية الحقل "file" كـ standard
+    ]),
+    (req, res, next) => {
+        // حدد الملف المرفوع أياً كان نوعه
+        req.file =
+            req.files.file?.[0] || null;
+
+        next();
+    },
+    uploadChatAttachment
+  );
+
+
+
+    routr.post('/uploadChatAttachment', uploadCloudFile(fileValidationTypes.image).single("file"), authentication(), uploadChatAttachment);
 
 
 routr.post("/resendOTP", resendOTP)
