@@ -6,7 +6,9 @@ import { createChapter, createExam, createLesson, forgetpassword,   getAllChapte
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat } from "../chat/chat/chat.service.js";
+import { ChatModel } from "../../DB/models/chaatmodel.js";
 
+import mongoose, { Schema, Types, model } from "mongoose";
 const routr = Router()
 
 
@@ -114,6 +116,50 @@ routr.get("/getAllRanks", getAllRanks)
 routr.get("/getSharedFile/:uniqueId", getSharedFile)
 routr.get("/getSubjectsByClass/:classId", getSubjectsByClass)
 routr.post("/getQuestionsByClassAndSubject", getQuestionsByClassAndSubject)
+
+
+routr.post("/testsendmessage", authentication(), async (req, res) => {
+    try {
+        const user = req.user;
+        const { message } = req.body;
+
+        if (!message || message.trim() === "") {
+            return res.status(400).json({ message: "❌ الرسالة فارغة" });
+        }
+
+        let chat = await ChatModel.findOne();
+
+        if (!chat) {
+            chat = await ChatModel.create({
+                participants: [user._id],
+                messages: []
+            });
+        }
+
+        if (!chat.participants.includes(user._id)) {
+            chat.participants.push(user._id);
+        }
+
+        const messageDoc = {
+            _id: new mongoose.Types.ObjectId(),
+            message,
+            senderId: user._id
+        };
+
+        chat.messages.push(messageDoc);
+        await chat.save();
+
+        res.status(200).json({
+            message: "✅ تم حفظ الرسالة",
+            savedMessage: messageDoc
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "❌ حدث خطأ", error: error.message });
+    }
+});
+  
 
 export default routr
 

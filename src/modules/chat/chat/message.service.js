@@ -3,6 +3,7 @@ import { ChatModel } from "../../../DB/models/chaatmodel.js";
 import { authenticationSocket } from "../../../middlewere/auth.socket.middlewere.js";
 import * as dbservice from "../../../DB/dbservice.js"
 import { scketConnections } from "../../../DB/models/User.model.js";
+import mongoose from 'mongoose';
 
 
 
@@ -27,22 +28,31 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // ✅ جلب الشات أو إنشاؤه
+            // 🔍 طباعة للتأكيد
+            console.log("📩 استقبلنا رسالة:", messageData);
+
+            // ✅ جلب أو إنشاء الشات الجماعي
             let chat = await ChatModel.findOne();
 
             if (!chat) {
                 chat = await ChatModel.create({
-                    participants: [userId],
+                    participants: [user._id],
                     messages: []
                 });
+                console.log("✅ تم إنشاء شات جديد:", chat._id.toString());
             }
 
-            // ✅ تأكد من وجود المستخدم ضمن المشاركين
-            if (!chat.participants.map(p => p.toString()).includes(userId)) {
+            // ✅ إضافة المستخدم للمشاركين إن لم يكن موجودًا
+            const isParticipant = chat.participants
+                .map((p) => p.toString())
+                .includes(userId);
+
+            if (!isParticipant) {
                 chat.participants.push(user._id);
+                console.log("➕ تم إضافة المستخدم للمشاركين");
             }
 
-            // ✅ إنشاء الرسالة وتخزينها
+            // ✅ إنشاء الرسالة
             const messageId = new mongoose.Types.ObjectId();
 
             const messageDoc = {
@@ -51,10 +61,15 @@ export const sendMessage = (socket) => {
                 senderId: user._id
             };
 
+            // ✅ إضافة الرسالة للمحادثة
             chat.messages.push(messageDoc);
+
+            // ✅ حفظ الشات في قاعدة البيانات
             await chat.save();
 
-            // ✅ تنسيق الرسالة للرد (زي الـ API)
+            console.log("✅ الرسالة تم حفظها في MongoDB:", messageDoc);
+
+            // ✅ تجهيز الرسالة بنفس تنسيق الـ API
             const messageToSend = {
                 _id: messageId,
                 message,
@@ -64,26 +79,32 @@ export const sendMessage = (socket) => {
                 }
             };
 
-            // ✅ إرسال الرسالة للمشاركين
+            // ✅ إرسال الرسالة للمشاركين (ما عدا المرسل)
             for (const participantId of chat.participants) {
                 const participantStr = participantId.toString();
-                if (participantStr !== userId && scketConnections.has(participantStr)) {
-                    socket.to(scketConnections.get(participantStr)).emit("receiveMessage", messageToSend);
+                if (
+                    participantStr !== userId &&
+                    scketConnections.has(participantStr)
+                ) {
+                    socket
+                        .to(scketConnections.get(participantStr))
+                        .emit("receiveMessage", messageToSend);
                 }
             }
 
-            // ✅ إرسال للمُرسل
-            socket.emit("successMessage", { message: messageToSend });
-
+            // ✅ إرسال الرد للمرسل نفسه
+            socket.emit("successMessage", {
+                message: messageToSend
+            });
         } catch (error) {
-            console.error("❌ Error sending message:", error);
+            console.error("❌ خطأ أثناء الإرسال:", error);
             socket.emit("socketErrorResponse", {
                 message: "❌ حدث خطأ أثناء إرسال الرسالة",
                 status: 500
             });
         }
     });
-};
+  };
   
 // export const sendMessage = (socket) => {
 //     return socket.on("sendMessage", async (messageData) => {
