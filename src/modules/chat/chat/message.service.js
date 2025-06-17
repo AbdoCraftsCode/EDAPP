@@ -7,7 +7,6 @@ import { scketConnections } from "../../../DB/models/User.model.js";
 
 
 
-
 export const sendMessage = (socket) => {
     socket.on("sendMessage", async (messageData) => {
         try {
@@ -28,7 +27,7 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // جلب الشات أو إنشاؤه
+            // ✅ جلب الشات أو إنشاؤه
             let chat = await ChatModel.findOne();
 
             if (!chat) {
@@ -38,12 +37,12 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // تأكد من وجود المستخدم ضمن المشاركين
-            if (!chat.participants.includes(user._id)) {
+            // ✅ تأكد من وجود المستخدم ضمن المشاركين
+            if (!chat.participants.map(p => p.toString()).includes(userId)) {
                 chat.participants.push(user._id);
             }
 
-            // إنشاء الرسالة
+            // ✅ إنشاء الرسالة وتخزينها
             const messageId = new mongoose.Types.ObjectId();
 
             const messageDoc = {
@@ -52,11 +51,10 @@ export const sendMessage = (socket) => {
                 senderId: user._id
             };
 
-            // إضافة الرسالة وحفظها
             chat.messages.push(messageDoc);
             await chat.save();
 
-            // تجهيز الرسالة بنفس تنسيق API
+            // ✅ تنسيق الرسالة للرد (زي الـ API)
             const messageToSend = {
                 _id: messageId,
                 message,
@@ -66,7 +64,7 @@ export const sendMessage = (socket) => {
                 }
             };
 
-            // إرسال الرسالة لكل المشاركين
+            // ✅ إرسال الرسالة للمشاركين
             for (const participantId of chat.participants) {
                 const participantStr = participantId.toString();
                 if (participantStr !== userId && scketConnections.has(participantStr)) {
@@ -74,7 +72,7 @@ export const sendMessage = (socket) => {
                 }
             }
 
-            // إرسال للمرسل نفسه
+            // ✅ إرسال للمُرسل
             socket.emit("successMessage", { message: messageToSend });
 
         } catch (error) {
@@ -85,8 +83,8 @@ export const sendMessage = (socket) => {
             });
         }
     });
-  };
-
+};
+  
 // export const sendMessage = (socket) => {
 //     return socket.on("sendMessage", async (messageData) => {
 //         try {
