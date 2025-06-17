@@ -8,6 +8,7 @@ const ChatSchema = new Schema({
         required: true
     }],
     messages: [{
+        _id: { type: mongoose.Schema.Types.ObjectId, auto: true }, // ✅ إضافة ID للرسالة
         message: { type: String, required: true },
         senderId: {
             type: Types.ObjectId,
@@ -16,6 +17,7 @@ const ChatSchema = new Schema({
         }
     }]
 }, { timestamps: true });
+  
   
 export const ChatModel = mongoose.models.Chat || model('Chat', ChatSchema);
 

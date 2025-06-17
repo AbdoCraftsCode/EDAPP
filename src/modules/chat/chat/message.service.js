@@ -38,7 +38,7 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // ✅ تأكد إن المستخدم في قائمة المشاركين
+            // ✅ تأكد إن المستخدم في المشاركين
             if (!chat.participants.includes(userId)) {
                 await ChatModel.updateOne(
                     { _id: chat._id },
@@ -47,20 +47,21 @@ export const sendMessage = (socket) => {
             }
 
             // ✅ إعداد الرسالة للتخزين
-            const messageId = new mongoose.Types.ObjectId(); // نولّد ID يدوي للرسالة
+            const messageId = new mongoose.Types.ObjectId();
             const messageForDB = {
                 _id: messageId,
                 message,
-                senderId: new mongoose.Types.ObjectId(userId)  // ❗️ مهم جدًا يكون ObjectId
+                senderId: new mongoose.Types.ObjectId(userId)
             };
 
-            // ✅ حفظ الرسالة في MongoDB
-            await ChatModel.updateOne(
-                { _id: chat._id },
-                { $push: { messages: messageForDB } }
+            // ✅ حفظ الرسالة في قاعدة البيانات
+            const updatedChat = await ChatModel.findByIdAndUpdate(
+                chat._id,
+                { $push: { messages: messageForDB } },
+                { new: true }
             );
 
-            // ✅ إعداد الرسالة لإرسالها عبر Socket (نفس تنسيق API)
+            // ✅ إعداد الرسالة للإرسال بنفس تنسيق الـ API
             const messageToSend = {
                 _id: messageId,
                 message,
@@ -70,15 +71,15 @@ export const sendMessage = (socket) => {
                 }
             };
 
-            // ✅ إرسالها لكل المشاركين
-            for (const participantId of chat.participants) {
+            // ✅ إرسال الرسالة للمشاركين
+            for (const participantId of updatedChat.participants) {
                 const participantStr = participantId.toString();
                 if (participantStr !== userId && scketConnections.has(participantStr)) {
                     socket.to(scketConnections.get(participantStr)).emit("receiveMessage", messageToSend);
                 }
             }
 
-            // ✅ إرسال للمرسل نفسه
+            // ✅ إرسال للمرسل نفسه لتحديث واجهته
             socket.emit("successMessage", { message: messageToSend });
 
         } catch (error) {
