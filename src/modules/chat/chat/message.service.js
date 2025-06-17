@@ -28,10 +28,9 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // ✅ جلب الشات الجماعي
+            // ✅ جلب أو إنشاء الشات الجماعي
             let chat = await ChatModel.findOne();
 
-            // ❗ إنشاء أول مرة
             if (!chat) {
                 chat = await ChatModel.create({
                     participants: [userId],
@@ -39,7 +38,7 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // ✅ إضافة المستخدم للمشاركين إن لم يكن موجود
+            // ✅ تأكد إن المستخدم في قائمة المشاركين
             if (!chat.participants.includes(userId)) {
                 await ChatModel.updateOne(
                     { _id: chat._id },
@@ -47,9 +46,23 @@ export const sendMessage = (socket) => {
                 );
             }
 
-            // ✅ إعداد الرسالة
-            const messageDoc = {
-                _id: new mongoose.Types.ObjectId(),
+            // ✅ إعداد الرسالة للتخزين
+            const messageId = new mongoose.Types.ObjectId(); // نولّد ID يدوي للرسالة
+            const messageForDB = {
+                _id: messageId,
+                message,
+                senderId: new mongoose.Types.ObjectId(userId)  // ❗️ مهم جدًا يكون ObjectId
+            };
+
+            // ✅ حفظ الرسالة في MongoDB
+            await ChatModel.updateOne(
+                { _id: chat._id },
+                { $push: { messages: messageForDB } }
+            );
+
+            // ✅ إعداد الرسالة لإرسالها عبر Socket (نفس تنسيق API)
+            const messageToSend = {
+                _id: messageId,
                 message,
                 senderId: {
                     _id: user._id,
@@ -57,22 +70,16 @@ export const sendMessage = (socket) => {
                 }
             };
 
-            // ✅ حفظ الرسالة في الداتا
-            await ChatModel.updateOne(
-                { _id: chat._id },
-                { $push: { messages: { message, senderId: userId } } }
-            );
-
-            // ✅ إرسالها لبقية المشاركين بنفس تنسيق الـ API
+            // ✅ إرسالها لكل المشاركين
             for (const participantId of chat.participants) {
                 const participantStr = participantId.toString();
                 if (participantStr !== userId && scketConnections.has(participantStr)) {
-                    socket.to(scketConnections.get(participantStr)).emit("receiveMessage", messageDoc);
+                    socket.to(scketConnections.get(participantStr)).emit("receiveMessage", messageToSend);
                 }
             }
 
             // ✅ إرسال للمرسل نفسه
-            socket.emit("successMessage", { message: messageDoc });
+            socket.emit("successMessage", { message: messageToSend });
 
         } catch (error) {
             console.error("❌ Error sending message:", error);
@@ -83,7 +90,6 @@ export const sendMessage = (socket) => {
         }
     });
   };
-
 
 // export const sendMessage = (socket) => {
 //     return socket.on("sendMessage", async (messageData) => {
