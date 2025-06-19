@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, createClass, generateShareLink,createFile, createImages, createSupject, getAllClasses, getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile, getSubjectsByClass, getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadChatAttachment, uploadLessonResource } from "./service/authontecation.service.js";
+import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getAllMaterials,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat } from "../chat/chat/chat.service.js";
@@ -77,11 +77,31 @@ routr.post(
   );
 
 
+  routr.post(
+      "/uploadMaterial",
+      authentication(),
+  
+    uploadCloudFile([
+        ...fileValidationTypes.image,
+        ...fileValidationTypes.document,
+    ]).fields([
+        { name: "image", maxCount: 1 },
+        { name: "pdf", maxCount: 1 },
+    ]),
+    (req, res, next) => {
+        req.imageFile = req.files.image?.[0] || null;
+        req.pdfFile = req.files.pdf?.[0] || null;
+        next();
+    },
+   uploadMaterial
+  );
+
 
     routr.post('/uploadChatAttachment', uploadCloudFile(fileValidationTypes.image).single("file"), authentication(), uploadChatAttachment);
 
 
 routr.post("/resendOTP", resendOTP)
+routr.get("/getAllMaterials", getAllMaterials)
 
 routr.post("/createChapter", authentication(), createChapter)
 routr.post("/createLesson",authentication() ,createLesson)

@@ -16,11 +16,15 @@ const ChatSchema = new Schema({
         voiceUrl: { type: String, default: null },
         imageUrl: { type: String, default: null },
         fileUrl: { type: String, default: null },
+        // fileName: { type: String },          // 🆕 اسم الملف
+        // fileSize: { type: Number },          // 🆕 الحجم بالميجابايت
+        // type: { type: String },
         senderId: {
             type: Types.ObjectId,
             ref: 'User',
             required: true,
-        }
+        },
+
     }]
 }, { timestamps: true });
 

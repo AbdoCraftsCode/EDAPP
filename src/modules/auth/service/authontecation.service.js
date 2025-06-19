@@ -15,6 +15,7 @@ import cloud from "../../../utlis/multer/cloudinary.js"
 import fs from 'fs';
 import ExamModel from "../../../DB/models/exams.model.js";
 import examresultModel from "../../../DB/models/examresult.model.js";
+import { MaterialModel } from "../../../DB/models/exampdf.model.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -722,7 +723,7 @@ export const uploadChatAttachment = asyncHandelr(async (req, res) => {
         resourceType = "image";
         folder = "edapp/chat/images";
     } else if (file.mimetype.startsWith("audio/") || file.mimetype.startsWith("video/")) {
-        resourceType = "video";
+        resourceType = "video"; // audio/video يُرفع كـ video في Cloudinary
         folder = "edapp/chat/voices";
     }
 
@@ -733,12 +734,91 @@ export const uploadChatAttachment = asyncHandelr(async (req, res) => {
         unique_filename: false
     });
 
-    fs.unlinkSync(file.path);
+    fs.unlinkSync(file.path); // حذف الملف المؤقت من السيرفر
+
+    const fileSizeMB = Math.ceil(file.size / (1024 * 1024)); // الحجم بالميجا
 
     res.status(201).json({
         message: "✅ تم رفع الملف بنجاح",
         url: result.secure_url,
         type: file.mimetype,
+        fileName: file.originalname,
+        fileSize: fileSizeMB,
         public_id: result.public_id
     });
 });
+
+
+export const uploadMaterial = async (req, res) => {
+    try {
+        const { title } = req.body;
+        const userId = req.user._id;
+
+        if (!title) {
+            return res.status(400).json({ message: "❌ يجب إدخال اسم المادة" });
+        }
+
+        let imageUrl = null;
+        let pdfUrl = null;
+
+        // ⬆️ رفع الصورة
+        if (req.imageFile) {
+            const imageResult = await cloud.uploader.upload(req.imageFile.path, {
+                resource_type: "image",
+                folder: "edapp/materials/images",
+                use_filename: true,
+                unique_filename: false,
+            });
+            imageUrl = imageResult.secure_url;
+            fs.unlinkSync(req.imageFile.path);
+        }
+
+        // ⬆️ رفع الـ PDF
+        if (req.pdfFile) {
+            const pdfResult = await cloud.uploader.upload(req.pdfFile.path, {
+                resource_type: "raw",
+                folder: "edapp/materials/pdfs",
+                use_filename: true,
+                unique_filename: false,
+            });
+            pdfUrl = pdfResult.secure_url;
+            fs.unlinkSync(req.pdfFile.path);
+        }
+
+        const savedMaterial = await MaterialModel.create({
+            title,
+            imageUrl,
+            pdfUrl,
+            uploadedBy: userId,
+        });
+
+        res.status(201).json({
+            message: "✅ تم رفع المادة بنجاح",
+            material: savedMaterial,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            message: "❌ حدث خطأ أثناء رفع المادة",
+            error: err.message,
+        });
+    }
+};
+  
+export const getAllMaterials = async (req, res) => {
+    try {
+        const materials = await MaterialModel.find().sort({ createdAt: -1 });
+
+        res.status(200).json({
+            message: "✅ تم جلب المواد بنجاح",
+            count: materials.length,
+            materials,
+        });
+    } catch (err) {
+        console.error("❌ Error fetching materials:", err);
+        res.status(500).json({
+            message: "❌ حدث خطأ أثناء جلب المواد",
+            error: err.message,
+        });
+    }
+  };
