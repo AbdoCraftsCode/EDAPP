@@ -16,6 +16,8 @@ import fs from 'fs';
 import ExamModel from "../../../DB/models/exams.model.js";
 import examresultModel from "../../../DB/models/examresult.model.js";
 import { MaterialModel } from "../../../DB/models/exampdf.model.js";
+import { ClassModel } from "../../../DB/models/supject.model.js";
+import { SubjectModel } from "../../../DB/models/class.model.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -269,12 +271,13 @@ export const resetpassword = asyncHandelr(async (req, res, next) => {
 
 export const createChapter = async (req, res) => {
     try {
-        const { title, description } = req.body;
+        const { title, description, subjectId } = req.body;
         const userId = req.user._id;
 
         const chapter = await chapterModel.create({
             title,
             description,
+            subjectId,
             createdBy: userId
         });
 
@@ -283,6 +286,30 @@ export const createChapter = async (req, res) => {
         res.status(500).json({ message: "❌ خطأ أثناء إنشاء الفصل", error: error.message });
     }
 };
+
+
+export const getChaptersBySubject = async (req, res) => {
+    try {
+        const { subjectId } = req.params;
+
+        if (!subjectId) {
+            return res.status(400).json({ message: "❌ يجب إرسال معرف المادة." });
+        }
+
+        const chapters = await chapterModel.find({ subjectId })
+            .populate("subjectId", "name")
+            .populate("createdBy", "username");
+
+        res.status(200).json({
+            message: "✅ تم جلب الفصول بنجاح",
+            chapters
+        });
+
+    } catch (err) {
+        console.error("❌ Error fetching chapters by subject:", err);
+        res.status(500).json({ message: "❌ حدث خطأ أثناء جلب الفصول", error: err.message });
+    }
+  };
   
 
 export const createLesson = async (req, res) => {
@@ -819,6 +846,109 @@ export const getAllMaterials = async (req, res) => {
         res.status(500).json({
             message: "❌ حدث خطأ أثناء جلب المواد",
             error: err.message,
+        });
+    }
+};
+  
+
+
+export const createClass = async (req, res) => {
+    try {
+        const { name } = req.body;
+
+        if (!name || name.trim() === "") {
+            return res.status(400).json({ message: "❌ يجب إدخال اسم الصف الدراسي" });
+        }
+
+        const existing = await ClassModel.findOne({ name });
+        if (existing) {
+            return res.status(400).json({ message: "❌ الصف الدراسي موجود بالفعل" });
+        }
+
+        const newClass = await ClassModel.create({ name });
+        res.status(201).json({ message: "✅ تم إنشاء الصف الدراسي", class: newClass });
+
+    } catch (error) {
+        console.error("Error creating class:", error);
+        res.status(500).json({ message: "❌ حدث خطأ أثناء إنشاء الصف", error: error.message });
+    }
+};
+  
+export const getAllClasses = async (req, res) => {
+    try {
+        const classes = await ClassModel.find().sort({ name: 1 });
+        res.status(200).json({ message: "✅ تم جلب الصفوف الدراسية", classes });
+    } catch (error) {
+        console.error("Error fetching classes:", error);
+        res.status(500).json({ message: "❌ حدث خطأ أثناء جلب الصفوف", error: error.message });
+    }
+};
+  
+export const createSubject = async (req, res) => {
+    try {
+        const { name, classId } = req.body;
+
+        if (!name || !classId) {
+            return res.status(400).json({ message: "❌ يجب إدخال اسم المادة ومعرف الصف الدراسي" });
+        }
+
+        const existing = await SubjectModel.findOne({ name, classId });
+        if (existing) {
+            return res.status(400).json({ message: "❌ هذه المادة موجودة بالفعل في هذا الصف" });
+        }
+
+        const newSubject = await SubjectModel.create({ name, classId });
+        res.status(201).json({ message: "✅ تم إنشاء المادة الدراسية", subject: newSubject });
+
+    } catch (err) {
+        console.error("Error creating subject:", err);
+        res.status(500).json({ message: "❌ حدث خطأ أثناء إنشاء المادة", error: err.message });
+    }
+};
+
+
+export const getAllSubjects = async (req, res) => {
+    try {
+        const { classId } = req.body; 
+
+        const filter = classId ? { classId } : {};
+        const subjects = await SubjectModel.find(filter).populate("classId", "name");
+
+        res.status(200).json({ message: "✅ تم جلب المواد الدراسية", subjects });
+    } catch (err) {
+        console.error("Error fetching subjects:", err);
+        res.status(500).json({ message: "❌ حدث خطأ أثناء جلب المواد", error: err.message });
+    }
+};
+  
+
+export const updateUserSelf = async (req, res) => {
+    try {
+        const { classId, gender } = req.body;
+        const userId = req.user._id; // ✅ جلب ID من التوكن
+
+        if (!classId && !gender) {
+            return res.status(400).json({ message: "❌ يجب إرسال الدور أو الصف لتعديله" });
+        }
+
+        const user = await Usermodel.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "❌ المستخدم غير موجود" });
+        }
+
+        if (classId) user.classId = classId;
+        if (gender) user.gender = gender;
+
+        await user.save();
+
+        res.status(200).json({
+            message: "✅ تم تعديل بيانات المستخدم بنجاح",
+            user
+        });
+    } catch (err) {
+        res.status(500).json({
+            message: "❌ فشل تعديل البيانات",
+            error: err.message
         });
     }
   };

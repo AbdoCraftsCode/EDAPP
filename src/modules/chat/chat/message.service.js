@@ -203,8 +203,137 @@ export const sendMessage = (socket) => {
 };
   
 
+const waitingUsers = [];
+
+export const handleMatching = (socket) => {
+    socket.on("startMatching", async ({ gender, lookingFor }) => {
+        const { data } = await authenticationSocket({ socket });
+
+        if (!data.valid) {
+            return socket.emit("socketErrorResponse", data);
+        }
+
+        const user = data.user;
+        const userId = user._id.toString();
+        const classId = user.classId?.toString();
+
+        console.log("📥 تم استقبال startMatching:", {
+            userId, gender, lookingFor, classId
+        });
+
+        if (!classId) {
+            return socket.emit("socketErrorResponse", {
+                message: "❌ لا يوجد صف دراسي مرتبط بالمستخدم",
+                status: 400
+            });
+        }
+
+        // طباعة القائمة قبل أي شيء
+        console.log("📃 قائمة الانتظار الحالية:", waitingUsers);
+
+        const alreadyWaiting = waitingUsers.some(
+            (u) => u.userId === userId && u.classId === classId
+        );
+        if (alreadyWaiting) {
+            console.log("⛔ المستخدم بالفعل في قائمة الانتظار");
+            return;
+        }
+
+        const matchIndex = waitingUsers.findIndex(
+            (u) =>
+                u.classId === classId &&
+                u.gender === lookingFor &&
+                u.lookingFor === gender
+        );
+
+        if (matchIndex !== -1) {
+            const matchedUser = waitingUsers.splice(matchIndex, 1)[0];
+
+            const roomId = `room-${userId}-${matchedUser.userId}`;
+
+            console.log("✅ تمت المطابقة:", { user1: userId, user2: matchedUser.userId });
+
+            socket.emit("matched", { roomId, partnerId: matchedUser.userId });
+
+            if (scketConnections.has(matchedUser.userId)) {
+                socket
+                    .to(scketConnections.get(matchedUser.userId))
+                    .emit("matched", { roomId, partnerId: userId });
+            }
+
+        } else {
+            const timeout = setTimeout(() => {
+                const index = waitingUsers.findIndex((u) => u.userId === userId);
+                if (index !== -1) {
+                    waitingUsers.splice(index, 1);
+                    socket.emit("timeout", {
+                        message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك.",
+                    });
+                }
+            }, 2 * 60 * 1000);
+
+            waitingUsers.push({
+                userId,
+                classId,
+                gender,
+                lookingFor,
+                socketId: socket.id,
+                timeout
+            });
+
+            console.log("➕ تم إضافة المستخدم لقائمة الانتظار");
+
+            socket.emit("waiting", {
+                message: "⏳ جاري البحث عن شريك مطابق في نفس الصف الدراسي...",
+            });
+        }
+    });
+
+    socket.on("disconnect", () => {
+        const index = waitingUsers.findIndex((u) => u.socketId === socket.id);
+        if (index !== -1) {
+            clearTimeout(waitingUsers[index].timeout);
+            waitingUsers.splice(index, 1);
+        }
+    });
+};
 
 
+
+
+
+
+export const handleVoiceCall = (socket) => {
+    socket.on("call-user", ({ toUserId, offer }) => {
+        const toSocketId = scketConnections.get(toUserId);
+        if (!toSocketId) return;
+        console.log("📞 إرسال offer من", socket.user._id, "إلى", toUserId);
+        socket.to(toSocketId).emit("receive-call", {
+            fromUserId: socket.user._id,
+            offer,
+        });
+    });
+
+    socket.on("answer-call", ({ toUserId, answer }) => {
+        const toSocketId = scketConnections.get(toUserId);
+        if (!toSocketId) return;
+        console.log("✅ الرد من", socket.user._id, "إلى", toUserId);
+        socket.to(toSocketId).emit("call-answered", {
+            fromUserId: socket.user._id,
+            answer,
+        });
+    });
+
+    socket.on("ice-candidate", ({ toUserId, candidate }) => {
+        const toSocketId = scketConnections.get(toUserId);
+        if (!toSocketId) return;
+        console.log("🧊 ICE من", socket.user._id, "إلى", toUserId);
+        socket.to(toSocketId).emit("ice-candidate", {
+            fromUserId: socket.user._id,
+            candidate,
+        });
+    });
+};
 
 
 

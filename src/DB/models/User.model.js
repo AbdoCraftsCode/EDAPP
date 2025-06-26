@@ -69,6 +69,10 @@ const userSchema = new mongoose.Schema(
         blockUntil: {
             type: Date,
         },
+        classId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Class", // ربط الطالب بالصف الدراسي
+          },
 
      
     },

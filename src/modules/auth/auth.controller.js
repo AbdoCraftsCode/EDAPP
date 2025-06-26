@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
-import { addQuestion, adduser, confirmOTP, createClass, generateShareLink,createFile, createImages, createSupject, getAllClasses, getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile, getSubjectsByClass, getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { createChapter, createExam, createLesson, forgetpassword,   getAllChapters,   getAllLessons,   getAllMaterials,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
+import { createChapter, createClass, createExam, createLesson, createSubject, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat } from "../chat/chat/chat.service.js";
@@ -101,6 +101,8 @@ routr.post(
 
 
 routr.post("/resendOTP", resendOTP)
+routr.post("/createClass", createClass)
+
 routr.get("/getAllMaterials", getAllMaterials)
 
 routr.post("/createChapter", authentication(), createChapter)
@@ -141,22 +143,26 @@ routr.get("/findGroupChat",  findGroupChat)
 routr.get("/GetFriendsList", authentication(),GetFriendsList)
 routr.post("/signupwithGmail", signupwithGmail)
 routr.post("/adduser/:friendId", authentication(),adduser)
-routr.post("/createClass", createClass)
-routr.post("/createSupject", createSupject)
+// routr.post("/createClass", createClass)
+routr.post("/createSubject", createSubject)
 routr.post("/confirmOTP", confirmOTP)
 routr.get("/Getprofiledata",authentication() ,Getprofiledata)
 routr.post("/login", login)
 routr.post("/shareFile/:id", shareFile)
 
-routr.post("/refreshToken",refreshToken)
+routr.post("/refreshToken", refreshToken)
+routr.post("/updateUserSelf", authentication(),updateUserSelf)
 routr.post("/forgetpassword", forgetpassword)
 routr.post("/resetpassword", resetpassword)
 routr.post("/loginwithGmail", loginwithGmail)
 routr.get("/getAllImages", getAllImages)
-routr.get("/getAllClasses", getAllClasses)
+// routr.get("/getAllClasses", getAllClasses)
 routr.get("/getAllRanks", getAllRanks)
+routr.get("/getAllSubjects", getAllSubjects)
+routr.get("/getAllClasses", getAllClasses)
+routr.get("/getChaptersBySubject/:subjectId", getChaptersBySubject)
 routr.get("/getSharedFile/:uniqueId", getSharedFile)
-routr.get("/getSubjectsByClass/:classId", getSubjectsByClass)
+
 routr.post("/getQuestionsByClassAndSubject", getQuestionsByClassAndSubject)
 
 
