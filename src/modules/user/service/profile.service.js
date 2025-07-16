@@ -10,6 +10,7 @@ import fs from 'fs';
 import admin from 'firebase-admin';
 
 import axios from 'axios';
+import { CartoonImageModel } from "../../../DB/models/cartoonImageSchema.model.js";
 
 // import { NotificationModel } from "../../../DB/models/points.model.js";
 
@@ -800,4 +801,49 @@ export const markAllAsRead = asyncHandelr(async (req, res) => {
     );
 
     res.status(200).json({ message: "✅ تم تعليم كل الإشعارات كمقروءة" });
+});
+
+
+export const uploadCartoonImage = asyncHandelr(async (req, res, next) => {
+    const { gender } = req.body;
+
+    if (!gender || !["Male", "Female"].includes(gender)) {
+        return next(new Error("❌ يجب تحديد النوع (Male أو Female)", { cause: 400 }));
+    }
+
+    if (!req.file) {
+        return next(new Error("❌ لم يتم رفع أي صورة", { cause: 400 }));
+    }
+
+    // رفع الصورة إلى Cloudinary
+    const { secure_url, public_id } = await cloud.uploader.upload(req.file.path, {
+        folder: `cartoonImages/${gender}`,
+    });
+
+    // حفظ البيانات في MongoDB
+    const newImage = await CartoonImageModel.create({
+        image: { secure_url, public_id },
+        gender
+    });
+
+    return res.status(201).json({
+        message: "✅ تم رفع الصورة بنجاح",
+        data: newImage,
+    });
+});
+
+export const getCartoonImagesByGender = asyncHandelr(async (req, res, next) => {
+    const { gender } = req.query;
+
+    if (!gender || !["Male", "Female"].includes(gender)) {
+        return next(new Error("❌ النوع غير صالح. يجب أن يكون 'Male' أو 'Female'", { cause: 400 }));
+    }
+
+    const images = await CartoonImageModel.find({ gender });
+
+    return res.status(200).json({
+        message: "✅ تم جلب الصور بنجاح",
+        count: images.length,
+        data: images,
+    });
 });

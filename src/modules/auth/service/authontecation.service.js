@@ -18,6 +18,7 @@ import examresultModel from "../../../DB/models/examresult.model.js";
 import { MaterialModel } from "../../../DB/models/exampdf.model.js";
 import { ClassModel } from "../../../DB/models/supject.model.js";
 import { SubjectModel } from "../../../DB/models/class.model.js";
+import { CartoonImageModel } from "../../../DB/models/cartoonImageSchema.model.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -134,6 +135,88 @@ export const refreshToken = asyncHandelr(async (req, res, next) => {
 });
 
 
+// export const loginwithGmail = asyncHandelr(async (req, res, next) => {
+//     const { accessToken } = req.body;
+
+//     if (!accessToken) {
+//         return next(new Error("Access token is required", { cause: 400 }));
+//     }
+
+//     // Step 1: Get user info from Google
+//     let userInfo;
+//     try {
+//         const response = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+//             headers: {
+//                 Authorization: `Bearer ${accessToken}`,
+//             },
+//         });
+//         userInfo = response.data;
+//     } catch (error) {
+//         console.error("Failed to fetch user info from Google:", error?.response?.data || error.message);
+//         return next(new Error("Failed to verify access token with Google", { cause: 401 }));
+//     }
+
+//     const { email, name, picture, email_verified } = userInfo;
+
+//     if (!email) {
+//         return next(new Error("Email is missing in Google response", { cause: 400 }));
+//     }
+//     if (!email_verified) {
+//         return next(new Error("Email not verified", { cause: 403 }));
+//     }
+
+
+//     let user = await dbservice.findOne({
+//         model: Usermodel,
+//         filter: { email },
+//     });
+
+//     if (user?.provider === providerTypes.system) {
+//         return next(new Error("Invalid account. Please login using your email/password", { cause: 403 }));
+//     }
+
+    
+//     if (!user) {
+//         let userId;
+//         let isUnique = false;
+//         while (!isUnique) {
+//             userId = Math.floor(1000000 + Math.random() * 9000000);
+//             const existingUser = await dbservice.findOne({
+//                 model: Usermodel,
+//                 filter: { userId },
+//             });
+//             if (!existingUser) isUnique = true;
+//         }
+
+//         user = await dbservice.create({
+//             model: Usermodel,
+//             data: {
+//                 email,
+//                 username: name,
+//                 profilePic: { secure_url: picture },
+//                 isConfirmed: email_verified,
+//                 provider: providerTypes.google,
+//                 userId, // ✅ Add generated userId here
+//                 gender: "Male", // لو تقدر تجيبه من جوجل أو تخليه undefined
+//             },
+//         });
+//     }
+
+//     // Step 4: Generate tokens
+//     const access_Token = generatetoken({
+//         payload: { id: user._id, country: user.country },
+//     });
+
+//     const refreshToken = generatetoken({
+//         payload: { id: user._id },
+//         expiresIn: "365d"
+//     });
+
+//     return successresponse(res, "Done", 200, { access_Token, refreshToken, user });
+// });
+
+
+
 export const loginwithGmail = asyncHandelr(async (req, res, next) => {
     const { accessToken } = req.body;
 
@@ -164,7 +247,10 @@ export const loginwithGmail = asyncHandelr(async (req, res, next) => {
         return next(new Error("Email not verified", { cause: 403 }));
     }
 
+    // 🟡 تعريف متغير لحالة المستخدم
+    let isFirstTime = false;
 
+    // Step 2: Check if user exists
     let user = await dbservice.findOne({
         model: Usermodel,
         filter: { email },
@@ -174,8 +260,10 @@ export const loginwithGmail = asyncHandelr(async (req, res, next) => {
         return next(new Error("Invalid account. Please login using your email/password", { cause: 403 }));
     }
 
-    
+    // Step 3: Create user if doesn't exist
     if (!user) {
+        isFirstTime = true;
+
         let userId;
         let isUnique = false;
         while (!isUnique) {
@@ -195,8 +283,8 @@ export const loginwithGmail = asyncHandelr(async (req, res, next) => {
                 profilePic: { secure_url: picture },
                 isConfirmed: email_verified,
                 provider: providerTypes.google,
-                userId, // ✅ Add generated userId here
-                gender: "Male", // لو تقدر تجيبه من جوجل أو تخليه undefined
+                userId,
+                gender: "Male", // أو undefined حسب المتاح
             },
         });
     }
@@ -211,11 +299,14 @@ export const loginwithGmail = asyncHandelr(async (req, res, next) => {
         expiresIn: "365d"
     });
 
-    return successresponse(res, "Done", 200, { access_Token, refreshToken, user });
+    // Step 5: Return response
+    return successresponse(res, "Done", 200, {
+        access_Token,
+        refreshToken,
+        user,
+        isFirstTime, // ✅ تمت إضافتها هنا
+    });
 });
-
-
-
 
  
 
@@ -922,13 +1013,43 @@ export const getAllSubjects = async (req, res) => {
 };
   
 
+// export const updateUserSelf = async (req, res) => {
+//     try {
+//         const { classId, gender } = req.body;
+//         const userId = req.user._id; // ✅ جلب ID من التوكن
+
+//         if (!classId && !gender) {
+//             return res.status(400).json({ message: "❌ يجب إرسال الدور أو الصف لتعديله" });
+//         }
+
+//         const user = await Usermodel.findById(userId);
+//         if (!user) {
+//             return res.status(404).json({ message: "❌ المستخدم غير موجود" });
+//         }
+
+//         if (classId) user.classId = classId;
+//         if (gender) user.gender = gender;
+
+//         await user.save();
+
+//         res.status(200).json({
+//             message: "✅ تم تعديل بيانات المستخدم بنجاح",
+//             user
+//         });
+//     } catch (err) {
+//         res.status(500).json({
+//             message: "❌ فشل تعديل البيانات",
+//             error: err.message
+//         });
+//     }
+//   };
 export const updateUserSelf = async (req, res) => {
     try {
-        const { classId, gender } = req.body;
-        const userId = req.user._id; // ✅ جلب ID من التوكن
+        const { classId, gender, imageId } = req.body; // 🆕 إضافة imageId
+        const userId = req.user._id;
 
-        if (!classId && !gender) {
-            return res.status(400).json({ message: "❌ يجب إرسال الدور أو الصف لتعديله" });
+        if (!classId && !gender && !imageId) {
+            return res.status(400).json({ message: "❌ يجب إرسال الصف أو النوع أو الصورة لتعديلها" });
         }
 
         const user = await Usermodel.findById(userId);
@@ -938,6 +1059,18 @@ export const updateUserSelf = async (req, res) => {
 
         if (classId) user.classId = classId;
         if (gender) user.gender = gender;
+
+        // 🆕 تحديث صورة المستخدم إذا تم إرسال imageId
+        if (imageId) {
+            const cartoonImage = await CartoonImageModel.findById(imageId);
+            if (!cartoonImage) {
+                return res.status(404).json({ message: "❌ لم يتم العثور على الصورة المختارة" });
+            }
+            user.profilePic = {
+                secure_url: cartoonImage.image.secure_url,
+                public_id: cartoonImage.image.public_id,
+            };
+        }
 
         await user.save();
 
@@ -951,4 +1084,4 @@ export const updateUserSelf = async (req, res) => {
             error: err.message
         });
     }
-  };
+};

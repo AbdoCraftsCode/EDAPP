@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as validators from "../user/user.validation.js"
 import { validation } from "../../middlewere/validation.middlewere.js";
 import { authentication, authorization } from "../../middlewere/authontcation.middlewere.js";
-import { coverimages, Getloginuseraccount, updateimage, updatepassword, Updateuseraccount, Getprofiledata, deleteProfileImage, deleteCoverImage, updateUsername, subscribeToPremium, createFolder, getUserFolders, createFile, getFolderFiles, deleteFolder, savetoken, getAllUsers, sendnotification, notifyall, deleteFcmToken, getUserNotifications, markAllAsRead, generateFolderShareLink, getSharedFolderContent } from "./service/profile.service.js";
+import { coverimages, Getloginuseraccount, updateimage, updatepassword, Updateuseraccount, Getprofiledata, deleteProfileImage, deleteCoverImage, updateUsername, subscribeToPremium, createFolder, getUserFolders, createFile, getFolderFiles, deleteFolder, savetoken, getAllUsers, sendnotification, notifyall, deleteFcmToken, getUserNotifications, markAllAsRead, generateFolderShareLink, getSharedFolderContent, uploadCartoonImage, getCartoonImagesByGender } from "./service/profile.service.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 
 const router = Router()
@@ -40,7 +40,7 @@ router.patch("/Updateuseraccount", authentication(), Updateuseraccount)
 router.patch("/updatepassword", authentication(), updatepassword)
 router.get("/Getprofiledata", authentication(), Getprofiledata)
 router.get("/getAllUsers", getAllUsers)
-
+router.get("/getCartoonImagesByGender", getCartoonImagesByGender)
 router.delete("/deleteFolder/:folderId", authentication(), deleteFolder)
 
 router.patch("/profile/coverimage", authentication(),
@@ -55,6 +55,13 @@ router.patch("/updateimage", authentication(),
    
     uploadCloudFile(fileValidationTypes.image).single('image')
     , updateimage);
+
+router.post("/uploadCartoonImage",
+
+    uploadCloudFile(fileValidationTypes.image).single('image')
+    , uploadCartoonImage);
+
+
 
 router.delete("/deleteProfileImage", authentication(), deleteProfileImage)
 router.delete("/deleteCoverImage", authentication(), deleteCoverImage)
