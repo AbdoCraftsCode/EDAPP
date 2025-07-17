@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { createChapter, createClass, createExam, createLesson, createSubject, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { createChapter, createClass, createExam, createLesson, createSubject, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat } from "../chat/chat/chat.service.js";
@@ -129,6 +129,8 @@ routr.post("/createExam", authentication(), createExam)
 routr.post("/submitExam", authentication(), submitExam)
 routr.get("/getResultByLesson/:lessonId", authentication(), getResultByLesson)
 routr.get("/getMyExamResults", authentication(), getMyExamResults)
+routr.get("/getMyExamStats", authentication(), getMyExamStats)
+
 routr.get("/getExamQuestions/:lessonId", authentication() ,getExamQuestions)
 routr.get("/getUserRoleById/:_id", getUserRoleById)
 routr.get("/getSharedFile/:fileId" ,getSharedFile)
