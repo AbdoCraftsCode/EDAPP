@@ -846,4 +846,4 @@ export const getCartoonImagesByGender = asyncHandelr(async (req, res, next) => {
         count: images.length,
         data: images,
     });
-});
+}); 

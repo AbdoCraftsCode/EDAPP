@@ -542,27 +542,22 @@ export const getLessonsByChapter = async (req, res) => {
         // جلب الدروس المرتبطة بالفصل
         const lessons = await lessonModel.find({ chapterId });
 
-        // لكل درس، نجيب الملفات المرتبطة بيه (PDF أو فيديو)
-        const populatedLessons = await Promise.all(
-            lessons.map(async (lesson) => {
-                const resources = await  LessonResourceModel.find({ lessonId: lesson._id });
+        // تجهيز البيانات بدون ملفات
+        const result = lessons.map((lesson) => ({
+            _id: lesson._id,
+            title: lesson.title,
+            description: lesson.description,
+            content: lesson.content,       // ✅ محتوى الدرس لو موجود
+            chapterId: lesson.chapterId,
+            createdBy: lesson.createdBy,
+            createdAt: lesson.createdAt,   // ✅ تاريخ الإنشاء
+            updatedAt: lesson.updatedAt,
+        }));
 
-                return {
-                    _id: lesson._id,
-                    title: lesson.title,
-                    description: lesson.description,
-                    files: resources.map((res) => ({
-                        type: res.fileType.startsWith("video") ? "video" : "pdf",
-                        url: res.url,
-                        description: res.description,
-                        fileName: res.fileName,
-                        fileSize: res.fileSize,
-                    })),
-                };
-            })
-        );
-
-        res.status(200).json({ message: "✅ الدروس والملفات", lessons: populatedLessons });
+        res.status(200).json({
+            message: "✅ تم جلب الدروس بدون ملفات",
+            lessons: result
+        });
     } catch (error) {
         res.status(500).json({ message: "❌ خطأ أثناء جلب الدروس", error: error.message });
     }
@@ -627,27 +622,42 @@ export const createExam = async (req, res) => {
 export const getExamQuestions = async (req, res) => {
     try {
         const { lessonId } = req.params;
+        const studentId = req.user._id;
 
         const exam = await ExamModel.findOne({ lessonId });
-
         if (!exam) {
             return res.status(404).json({ message: "❌ لا يوجد امتحان لهذا الدرس" });
         }
 
-        const questions = exam.questions.map(q => ({
-            _id: q._id,
-            question: q.question,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-            mark: q.mark
-        }));
-        
+        // ✅ نجيب نتيجة الطالب لو موجودة
+        const existingResult = await examresultModel.findOne({ lessonId, studentId });
 
-        res.status(200).json({ questions });
+        let answeredQuestionIds = [];
+
+        if (existingResult) {
+            answeredQuestionIds = existingResult.answers.map(a => a.questionId.toString());
+        }
+
+        // ✅ نحذف الأسئلة اللي الطالب جاوبها قبل كده
+        const questions = exam.questions
+            .filter(q => !answeredQuestionIds.includes(q._id.toString()))
+            .map(q => ({
+                _id: q._id,
+                question: q.question,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                mark: q.mark
+            }));
+
+        res.status(200).json({
+            message: "✅ تم جلب الأسئلة المتبقية فقط",
+            questions
+        });
     } catch (err) {
         res.status(500).json({ message: "❌ فشل في جلب الأسئلة", error: err.message });
     }
 };
+
   
 
 export const submitExam = async (req, res) => {
