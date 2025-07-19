@@ -2,11 +2,12 @@ import { ChatModel } from "../../../DB/models/chaatmodel.js";
 // import { scketConnections } from "../../../DB/models/User.model.js";
 import { authenticationSocket } from "../../../middlewere/auth.socket.middlewere.js";
 import * as dbservice from "../../../DB/dbservice.js"
-import { scketConnections } from "../../../DB/models/User.model.js";
+import Usermodel, { scketConnections } from "../../../DB/models/User.model.js";
 import mongoose from 'mongoose';
 import { GeneralQuestionModel } from "../../../DB/models/questionSchema.model.js";
 import { v4 as uuidv4 } from "uuid";
 import RoomSchemaModel from "../../../DB/models/RoomSchema.model.js";
+import examresultModel from "../../../DB/models/examresult.model.js";
 
 
 
@@ -301,9 +302,124 @@ export const sendMessage = (socket) => {
 // };
 
 
+// const waitingUsers = [];
+
+// export const handleMatching = (socket) => {
+//     socket.on("startMatching", async ({ gender, lookingFor }) => {
+//         const { data } = await authenticationSocket({ socket });
+
+//         if (!data.valid) {
+//             return socket.emit("socketErrorResponse", data);
+//         }
+
+//         const user = data.user;
+//         const userId = user._id.toString();
+//         const classId = user.classId?.toString();
+
+//         console.log("📥 تم استقبال startMatching:", {
+//             userId, gender, lookingFor, classId
+//         });
+
+//         if (!classId) {
+//             return socket.emit("socketErrorResponse", {
+//                 message: "❌ لا يوجد صف دراسي مرتبط بالمستخدم",
+//                 status: 400
+//             });
+//         }
+
+//         console.log("📃 قائمة الانتظار الحالية:", waitingUsers);
+
+//         const alreadyWaiting = waitingUsers.some(
+//             (u) => u.userId === userId && u.classId === classId
+//         );
+//         if (alreadyWaiting) {
+//             console.log("⛔ المستخدم بالفعل في قائمة الانتظار");
+//             return;
+//         }
+
+//         const matchIndex = waitingUsers.findIndex(
+//             (u) =>
+//                 u.classId === classId &&
+//                 u.gender === lookingFor &&
+//                 u.lookingFor === gender
+//         );
+
+//         if (matchIndex !== -1) {
+//             const matchedUser = waitingUsers.splice(matchIndex, 1)[0];
+//             const roomId = `room-${userId}-${matchedUser.userId}`;
+
+//             // ✅ جلب الأسئلة العشوائية بناءً على الصف الدراسي
+//             const questions = await GeneralQuestionModel.aggregate([
+//                 { $match: { classId: new mongoose.Types.ObjectId(classId) } },
+//                 { $sample: { size: 10 } }
+//             ]);
+
+//             console.log("🧠 تم إرسال الأسئلة للطرفين:", questions);
+
+//             socket.emit("matched", {
+//                 roomId,
+//                 partnerId: matchedUser.userId,
+//                 questions
+//             });
+
+//             if (scketConnections.has(matchedUser.userId)) {
+//                 socket
+//                     .to(scketConnections.get(matchedUser.userId))
+//                     .emit("matched", {
+//                         roomId,
+//                         partnerId: userId,
+//                         questions
+//                     });
+//             }
+
+//         } else {
+//             const timeout = setTimeout(() => {
+//                 const index = waitingUsers.findIndex((u) => u.userId === userId);
+//                 if (index !== -1) {
+//                     waitingUsers.splice(index, 1);
+//                     socket.emit("timeout", {
+//                         message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك.",
+//                     });
+//                 }
+//             }, 2 * 60 * 1000);
+
+//             waitingUsers.push({
+//                 userId,
+//                 classId,
+//                 gender,
+//                 lookingFor,
+//                 socketId: socket.id,
+//                 timeout
+//             });
+
+//             console.log("➕ تم إضافة المستخدم لقائمة الانتظار");
+
+//             socket.emit("waiting", {
+//                 message: "⏳ جاري البحث عن شريك مطابق في نفس الصف الدراسي...",
+//             });
+//         }
+//     });
+
+//     socket.on("disconnect", () => {
+//         const index = waitingUsers.findIndex((u) => u.socketId === socket.id);
+//         if (index !== -1) {
+//             clearTimeout(waitingUsers[index].timeout);
+//             waitingUsers.splice(index, 1);
+//         }
+//     });
+// };
+
+
 const waitingUsers = [];
+// const scketConnections = new Map(); // تأكد من استخدام هذا المتغير في مكان آخر لتخزين socket.id
 
 export const handleMatching = (socket) => {
+    // ⏺️ إضافة المستخدم إلى قائمة الاتصالات
+    socket.on("registerConnection", ({ userId }) => {
+        scketConnections.set(userId, socket.id);
+    });
+
+    // ✅ بدء المطابقة
     socket.on("startMatching", async ({ gender, lookingFor }) => {
         const { data } = await authenticationSocket({ socket });
 
@@ -326,8 +442,6 @@ export const handleMatching = (socket) => {
             });
         }
 
-        console.log("📃 قائمة الانتظار الحالية:", waitingUsers);
-
         const alreadyWaiting = waitingUsers.some(
             (u) => u.userId === userId && u.classId === classId
         );
@@ -347,7 +461,7 @@ export const handleMatching = (socket) => {
             const matchedUser = waitingUsers.splice(matchIndex, 1)[0];
             const roomId = `room-${userId}-${matchedUser.userId}`;
 
-            // ✅ جلب الأسئلة العشوائية بناءً على الصف الدراسي
+            // ✅ جلب أسئلة عشوائية بناءً على الصف الدراسي
             const questions = await GeneralQuestionModel.aggregate([
                 { $match: { classId: new mongoose.Types.ObjectId(classId) } },
                 { $sample: { size: 10 } }
@@ -355,19 +469,68 @@ export const handleMatching = (socket) => {
 
             console.log("🧠 تم إرسال الأسئلة للطرفين:", questions);
 
+            // ✅ دالة لجلب إحصائيات المستخدم
+            const getUserStats = async (id) => {
+                const result = await examresultModel.aggregate([
+                    { $match: { studentId: new mongoose.Types.ObjectId(id) } },
+                    {
+                        $group: {
+                            _id: "$studentId",
+                            totalScore: { $sum: "$totalScore" },
+                            maxScore: { $sum: "$maxScore" },
+                            examsCount: { $sum: 1 }
+                        }
+                    },
+                    {
+                        $addFields: {
+                            percentage: {
+                                $cond: [
+                                    { $eq: ["$maxScore", 0] },
+                                    0,
+                                    { $multiply: [{ $divide: ["$totalScore", "$maxScore"] }, 100] }
+                                ]
+                            }
+                        }
+                    }
+                ]);
+
+                const user = await Usermodel.findById(id).select("username email classId profilePic userId");
+
+                return {
+                    studentName: user?.username || "مجهول",
+                    studentEmail: user?.email || "",
+                    profilePic: user?.profilePic || "",
+                    classId: user?.classId || "",
+                    userId: user?.userId || "",
+                    totalScore: result[0]?.totalScore || 0,
+                    maxScore: result[0]?.maxScore || 0,
+                    percentage: `${Math.round(result[0]?.percentage || 0)}%`,
+                    examsCount: result[0]?.examsCount || 0
+                };
+            };
+
+            const userStats = await getUserStats(userId);
+            const matchedStats = await getUserStats(matchedUser.userId);
+
+            // ✅ إرسال البيانات للطرف الأول
             socket.emit("matched", {
                 roomId,
                 partnerId: matchedUser.userId,
-                questions
+                questions,
+                me: userStats,
+                opponent: matchedStats
             });
 
+            // ✅ إرسال البيانات للطرف الثاني
             if (scketConnections.has(matchedUser.userId)) {
                 socket
                     .to(scketConnections.get(matchedUser.userId))
                     .emit("matched", {
                         roomId,
                         partnerId: userId,
-                        questions
+                        questions,
+                        me: matchedStats,
+                        opponent: userStats
                     });
             }
 
@@ -377,10 +540,10 @@ export const handleMatching = (socket) => {
                 if (index !== -1) {
                     waitingUsers.splice(index, 1);
                     socket.emit("timeout", {
-                        message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك.",
+                        message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك."
                     });
                 }
-            }, 2 * 60 * 1000);
+            }, 2 * 60 * 1000); // دقيقتين
 
             waitingUsers.push({
                 userId,
@@ -394,11 +557,12 @@ export const handleMatching = (socket) => {
             console.log("➕ تم إضافة المستخدم لقائمة الانتظار");
 
             socket.emit("waiting", {
-                message: "⏳ جاري البحث عن شريك مطابق في نفس الصف الدراسي...",
+                message: "⏳ جاري البحث عن شريك مطابق في نفس الصف الدراسي..."
             });
         }
     });
 
+    // ✅ إزالة المستخدم عند قطع الاتصال
     socket.on("disconnect", () => {
         const index = waitingUsers.findIndex((u) => u.socketId === socket.id);
         if (index !== -1) {
@@ -407,8 +571,6 @@ export const handleMatching = (socket) => {
         }
     });
 };
-
-
 
 export const handleVoiceCall = (socket) => {
     socket.on("call-user", ({ toUserId, offer }) => {
