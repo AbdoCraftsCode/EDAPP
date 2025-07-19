@@ -873,7 +873,7 @@ export const getMyExamStats = async (req, res) => {
             });
         }
 
-        const user = await Usermodel.findById(studentId).select("username email classId profilePic userId");
+        const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender");
 
         const stats = {
             studentName: user?.username || "مجهول",
@@ -881,6 +881,7 @@ export const getMyExamStats = async (req, res) => {
             profilePic: user?.profilePic || "",
             classId: user?.classId || "",
             userId: user?.userId || "",
+            gender: user?.gender || "",
             totalScore: result[0].totalScore,
             maxScore: result[0].maxScore,
             percentage: `${Math.round(result[0].percentage)}%`,
