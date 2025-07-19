@@ -21,7 +21,7 @@ const examResultSchema = new mongoose.Schema({
     lessonId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Lesson",
-        required: true
+        // required: true
     },
     totalScore: {
         type: Number,

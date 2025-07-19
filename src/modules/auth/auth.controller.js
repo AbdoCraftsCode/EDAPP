@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName } from "./service/regestration.service.js";
-import { createChapter, createClass, createExam, createLesson, createSubject, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createSubject, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat } from "../chat/chat/chat.service.js";
@@ -135,6 +135,9 @@ routr.get("/getExamQuestions/:lessonId", authentication() ,getExamQuestions)
 routr.get("/getUserRoleById/:_id", getUserRoleById)
 routr.get("/getSharedFile/:fileId" ,getSharedFile)
 routr.post("/addQuestion", addQuestion)
+
+routr.post("/bulkCreateGeneralQuestions", bulkCreateGeneralQuestions)
+
 routr.post("/submitAnswer", authentication(), submitAnswer)
 routr.get("/getMyRank", authentication(), getMyRank)
 routr.get("/getTopStudentsOverall", getTopStudentsOverall)
@@ -153,13 +156,17 @@ routr.post("/login", login)
 routr.post("/shareFile/:id", shareFile)
 
 routr.post("/refreshToken", refreshToken)
-routr.post("/updateUserSelf", authentication(),updateUserSelf)
+routr.post("/updateUserSelf", authentication(), updateUserSelf)
+
+routr.post("/submitMatchingExam", authentication(), submitMatchingExam)
 routr.post("/forgetpassword", forgetpassword)
 routr.post("/resetpassword", resetpassword)
 routr.post("/loginwithGmail", loginwithGmail)
 routr.get("/getAllImages", getAllImages)
 // routr.get("/getAllClasses", getAllClasses)
 routr.get("/getAllRanks", getAllRanks)
+routr.get("/getRandomQuestionsByClass/:classId", getRandomQuestionsByClass)
+
 routr.get("/getAllSubjects", getAllSubjects)
 routr.get("/getAllClasses", getAllClasses)
 routr.get("/getChaptersBySubject/:subjectId", getChaptersBySubject)

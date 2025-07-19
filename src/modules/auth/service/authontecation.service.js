@@ -19,6 +19,8 @@ import { MaterialModel } from "../../../DB/models/exampdf.model.js";
 import { ClassModel } from "../../../DB/models/supject.model.js";
 import { SubjectModel } from "../../../DB/models/class.model.js";
 import { CartoonImageModel } from "../../../DB/models/cartoonImageSchema.model.js";
+import { GeneralQuestionModel } from "../../../DB/models/questionSchema.model.js";
+import mongoose from "mongoose";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -871,13 +873,14 @@ export const getMyExamStats = async (req, res) => {
             });
         }
 
-        const user = await Usermodel.findById(studentId).select("username email classId profilePic");
+        const user = await Usermodel.findById(studentId).select("username email classId profilePic userId");
 
         const stats = {
             studentName: user?.username || "مجهول",
             studentEmail: user?.email || "",
             profilePic: user?.profilePic || "",
             classId: user?.classId || "",
+            userId: user?.userId || "",
             totalScore: result[0].totalScore,
             maxScore: result[0].maxScore,
             percentage: `${Math.round(result[0].percentage)}%`,
@@ -1152,6 +1155,124 @@ export const updateUserSelf = async (req, res) => {
     } catch (err) {
         res.status(500).json({
             message: "❌ فشل تعديل البيانات",
+            error: err.message
+        });
+    }
+};
+
+
+// controllers/generalQuestion.controller.js
+
+
+
+export const bulkCreateGeneralQuestions = async (req, res) => {
+    try {
+        const questions = req.body;
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({ message: "❌ يجب إرسال مصفوفة من الأسئلة" });
+        }
+
+        const created = await GeneralQuestionModel.insertMany(questions);
+
+        res.status(201).json({
+            message: "✅ تم إضافة الأسئلة بنجاح",
+            insertedCount: created.length,
+            insertedQuestions: created,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء إضافة الأسئلة", error: err.message });
+    }
+};
+
+
+export const getRandomQuestionsByClass = async (req, res) => {
+    try {
+        const { classId } = req.params;
+        const limit = parseInt(req.query.limit) || 10; // عدد الأسئلة العشوائية
+
+        if (!classId) {
+            return res.status(400).json({ message: "❌ classId مفقود في الرابط" });
+        }
+
+        const questions = await GeneralQuestionModel.aggregate([
+            { $match: { classId: { $eq: new mongoose.Types.ObjectId(classId) } } },
+            { $sample: { size: limit } } // جلب عدد عشوائي
+        ]);
+
+        res.status(200).json({
+            message: "✅ تم جلب الأسئلة العشوائية بنجاح",
+            questions
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء جلب الأسئلة", error: err.message });
+    }
+};
+
+export const submitMatchingExam = async (req, res) => {
+    try {
+        const { classId, answers } = req.body;
+        const studentId = req.user._id;
+
+        if (!classId || !Array.isArray(answers)) {
+            return res.status(400).json({
+                message: "❌ يجب إرسال classId و answers"
+            });
+        }
+
+        // جلب الأسئلة الخاصة بالصف الدراسي
+        const questions = await GeneralQuestionModel.find({ classId });
+
+        if (!questions.length) {
+            return res.status(404).json({
+                message: "❌ لم يتم العثور على أسئلة لهذا الصف"
+            });
+        }
+
+        let totalScore = 0;
+        let maxScore = 0;
+        const result = [];
+
+        for (const answer of answers) {
+            const question = questions.find(q => q._id.toString() === answer.questionId);
+            if (!question) continue;
+
+            const isCorrect = answer.selectedAnswer === question.correctAnswer;
+            if (isCorrect) totalScore += question.mark;
+            maxScore += question.mark;
+
+            result.push({
+                questionId: question._id,
+                selectedAnswer: answer.selectedAnswer || null,
+                correctAnswer: question.correctAnswer,
+                isCorrect,
+                mark: question.mark
+            });
+        }
+
+        const savedResult = await examresultModel.create({
+            studentId,
+            classId,
+            totalScore,
+            maxScore,
+            answers: result
+        });
+
+        res.status(201).json({
+            message: "✅ تم تصحيح وحفظ نتيجة الامتحان المشترك",
+            totalScore,
+            maxScore,
+            result,
+            savedResult
+        });
+
+    } catch (err) {
+        console.error("❌ خطأ أثناء تصحيح الامتحان:", err);
+        res.status(500).json({
+            message: "❌ حدث خطأ أثناء حفظ نتيجة الامتحان المشترك",
             error: err.message
         });
     }

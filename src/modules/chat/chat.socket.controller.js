@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
 import { logoutSocket, regiserSocket } from "./chat/chat.auth.service.js";
-import { handleMatching, handleVoiceCall, sendMessage } from "./chat/message.service.js";
+import { handleJoinRoom, handleMatching, handleRoomCreation, handleVoiceCall, sendMessage } from "./chat/message.service.js";
 
 
 
@@ -21,6 +21,8 @@ export const runIo = (httpServer) => {
         await logoutSocket(socket);
         await handleMatching(socket);
         await handleVoiceCall(socket);
+        await handleRoomCreation(socket);
+        await handleJoinRoom(socket);
     });
 
 
