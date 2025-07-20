@@ -838,14 +838,74 @@ export const getTopStudentsOverall = async (req, res) => {
   };
 
 
+// export const getMyExamStats = async (req, res) => {
+//     try {
+//         const studentId = req.user._id;
+
+//         const result = await examresultModel.aggregate([
+//             {
+//                 $match: { studentId: studentId }
+//             },
+//             {
+//                 $group: {
+//                     _id: "$studentId",
+//                     totalScore: { $sum: "$totalScore" },
+//                     maxScore: { $sum: "$maxScore" },
+//                     examsCount: { $sum: 1 }
+//                 }
+//             },
+//             {
+//                 $addFields: {
+//                     percentage: {
+//                         $cond: [
+//                             { $eq: ["$maxScore", 0] },
+//                             0,
+//                             { $multiply: [{ $divide: ["$totalScore", "$maxScore"] }, 100] }
+//                         ]
+//                     }
+//                 }
+//             }
+//         ]);
+
+//         if (result.length === 0) {
+//             return res.status(404).json({
+//                 message: "❌ لا توجد نتائج لهذا الطالب حتى الآن"
+//             });
+//         }
+
+//         const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender");
+
+//         const stats = {
+//             studentName: user?.username || "مجهول",
+//             studentEmail: user?.email || "",
+//             profilePic: user?.profilePic || "",
+//             classId: user?.classId || "",
+//             userId: user?.userId || "",
+//             gender: user?.gender || "",
+//             totalScore: result[0].totalScore,
+//             maxScore: result[0].maxScore,
+//             percentage: `${Math.round(result[0].percentage)}%`,
+//             examsCount: result[0].examsCount
+//         };
+
+//         res.status(200).json({
+//             message: "✅ تم جلب بيانات الطالب",
+//             studentStats: stats
+//         });
+
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).json({ message: "❌ خطأ أثناء جلب البيانات", error: err.message });
+//     }
+// };
+
+
 export const getMyExamStats = async (req, res) => {
     try {
         const studentId = req.user._id;
 
         const result = await examresultModel.aggregate([
-            {
-                $match: { studentId: studentId }
-            },
+            { $match: { studentId: studentId } },
             {
                 $group: {
                     _id: "$studentId",
@@ -867,25 +927,23 @@ export const getMyExamStats = async (req, res) => {
             }
         ]);
 
-        if (result.length === 0) {
-            return res.status(404).json({
-                message: "❌ لا توجد نتائج لهذا الطالب حتى الآن"
-            });
-        }
-
         const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender");
 
+        if (!user) {
+            return res.status(404).json({ message: "❌ لم يتم العثور على الطالب" });
+        }
+
         const stats = {
-            studentName: user?.username || "مجهول",
-            studentEmail: user?.email || "",
-            profilePic: user?.profilePic || "",
-            classId: user?.classId || "",
-            userId: user?.userId || "",
-            gender: user?.gender || "",
-            totalScore: result[0].totalScore,
-            maxScore: result[0].maxScore,
-            percentage: `${Math.round(result[0].percentage)}%`,
-            examsCount: result[0].examsCount
+            studentName: user.username || "مجهول",
+            studentEmail: user.email || "",
+            profilePic: user.profilePic || "",
+            classId: user.classId || "",
+            userId: user.userId || "",
+            gender: user.gender || "",
+            totalScore: result[0]?.totalScore || 0,
+            maxScore: result[0]?.maxScore || 0,
+            percentage: `${Math.round(result[0]?.percentage || 0)}%`,
+            examsCount: result[0]?.examsCount || 0
         };
 
         res.status(200).json({
@@ -898,9 +956,6 @@ export const getMyExamStats = async (req, res) => {
         res.status(500).json({ message: "❌ خطأ أثناء جلب البيانات", error: err.message });
     }
 };
-
-
-  
 export const uploadChatAttachment = asyncHandelr(async (req, res) => {
     const file = req.file;
     const userId = req.user._id;
