@@ -731,15 +731,23 @@ export const getMyExamResults = async (req, res) => {
 
         const formattedResults = results.map(result => ({
             lessonTitle: result.lessonId?.title || "غير معروف",
+            lessonId: result.lessonId?._id || null,
             totalScore: result.totalScore,
             maxScore: result.maxScore,
             questionsCount: result.answers.length,
             percentage: `${Math.round((result.totalScore / result.maxScore) * 100)}%`,
-            createdAt: result.createdAt
+            createdAt: result.createdAt,
+            answers: result.answers.map(answer => ({
+                questionId: answer.questionId,
+                selectedAnswer: answer.selectedAnswer,
+                correctAnswer: answer.correctAnswer,
+                isCorrect: answer.isCorrect,
+                mark: answer.mark
+            }))
         }));
 
         res.status(200).json({
-            message: "✅ تم جلب نتائج الطالب",
+            message: "✅ تم جلب نتائج الطالب مع الإجابات",
             count: formattedResults.length,
             results: formattedResults
         });
@@ -752,6 +760,7 @@ export const getMyExamResults = async (req, res) => {
         });
     }
 };
+
   
 export const getResultByLesson = async (req, res) => {
     try {
