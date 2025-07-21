@@ -740,6 +740,7 @@ export const getMyExamResults = async (req, res) => {
             answers: result.answers.map(answer => ({
                 questionId: answer.questionId,
                 selectedAnswer: answer.selectedAnswer,
+                // question: answer.question,
                 correctAnswer: answer.correctAnswer,
                 isCorrect: answer.isCorrect,
                 mark: answer.mark

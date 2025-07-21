@@ -8,6 +8,7 @@ const RoomSchema = new mongoose.Schema({
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
     chapterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chapter' },
     lessonId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' },
+    classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
     users: [
         {
             userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

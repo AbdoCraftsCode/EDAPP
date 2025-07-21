@@ -631,6 +631,7 @@ export const handleRoomCreation = (socket) => {
                 subjectId,
                 chapterId,
                 lessonId,
+                classId: user.classId,
                 users: [{ userId }]
             });
 
