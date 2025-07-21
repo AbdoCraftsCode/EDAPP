@@ -610,6 +610,82 @@ export const handleVoiceCall = (socket) => {
 
 const availableRooms = new Map();
 
+// export const handleRoomCreation = (socket) => {
+//     socket.on("createRoom", async ({ roomName, subjectId, chapterId, lessonId }) => {
+//         const { data } = await authenticationSocket({ socket });
+
+//         if (!data.valid) {
+//             return socket.emit("socketErrorResponse", data);
+//         }
+
+//         const user = data.user;
+//         const userId = user._id.toString();
+//         const roomId = uuidv4(); // ID عشوائي للروم
+
+//         try {
+//             // 🔁 حفظ في قاعدة البيانات
+//             const newRoom = await RoomSchemaModel.create({
+//                 roomId,
+//                 roomName,
+//                 ownerId: userId,
+//                 subjectId,
+//                 chapterId,
+//                 lessonId,
+//                 classId: user.classId,
+//                 users: [{ userId }]
+//             });
+
+//             // 💾 حفظ في الذاكرة المؤقتة
+//             availableRooms.set(roomId, {
+//                 roomId,
+//                 roomName,
+//                 ownerId: userId,
+//                 subjectId,
+//                 chapterId,
+//                 lessonId,
+//                 users: [{ userId, socketId: socket.id }],
+//                 bannedUsers: [],
+//                 isStarted: false
+//             });
+
+//             // 💬 رد للمستخدم بإنشاء الروم بنجاح
+//             socket.emit("roomCreated", {
+//                 message: "✅ تم إنشاء الروم بنجاح",
+//                 roomId,
+//                 roomName,
+//                 subjectId,
+//                 chapterId,
+//                 lessonId
+//             });
+
+//             console.log("✅ تم إنشاء روم:", roomId);
+//         } catch (err) {
+//             console.error("❌ خطأ أثناء إنشاء الروم:", err);
+//             socket.emit("socketErrorResponse", {
+//                 message: "❌ حدث خطأ أثناء إنشاء الروم",
+//                 error: err.message
+//             });
+//         }
+//     });
+
+//     // 🛑 تنظيف عند فصل الاتصال
+//     socket.on("disconnect", () => {
+//         for (const [roomId, room] of availableRooms) {
+//             const index = room.users.findIndex((u) => u.socketId === socket.id);
+//             if (index !== -1) {
+//                 room.users.splice(index, 1);
+
+//                 // لو مفيش أعضاء بالروم نحذفه
+//                 if (room.users.length === 0) {
+//                     availableRooms.delete(roomId);
+//                 }
+//                 break;
+//             }
+//         }
+//     });
+// };
+
+// export { availableRooms };
 export const handleRoomCreation = (socket) => {
     socket.on("createRoom", async ({ roomName, subjectId, chapterId, lessonId }) => {
         const { data } = await authenticationSocket({ socket });
@@ -669,16 +745,26 @@ export const handleRoomCreation = (socket) => {
     });
 
     // 🛑 تنظيف عند فصل الاتصال
-    socket.on("disconnect", () => {
+    socket.on("disconnect", async () => {
         for (const [roomId, room] of availableRooms) {
             const index = room.users.findIndex((u) => u.socketId === socket.id);
             if (index !== -1) {
+                const userId = room.users[index].userId;
+
+                // 1. حذف من الذاكرة
                 room.users.splice(index, 1);
 
-                // لو مفيش أعضاء بالروم نحذفه
                 if (room.users.length === 0) {
                     availableRooms.delete(roomId);
                 }
+
+                // ✅ 2. حذف من قاعدة البيانات
+                await RoomSchemaModel.updateOne(
+                    { roomId },
+                    { $pull: { users: { userId } } }
+                );
+
+                console.log(`👋 تم إزالة المستخدم ${userId} من الروم ${roomId} بعد الانفصال`);
                 break;
             }
         }
@@ -686,7 +772,6 @@ export const handleRoomCreation = (socket) => {
 };
 
 export { availableRooms };
-
   
 
 
