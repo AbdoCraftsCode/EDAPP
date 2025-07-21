@@ -837,3 +837,31 @@ export const handleRoomEvents = (io, socket) => {
         }
     });
 };
+
+export const handleAvailableRoomsByClass = (socket) => {
+    socket.on("getAvailableRooms", async () => {
+        const { data } = await authenticationSocket({ socket });
+
+        if (!data.valid) {
+            return socket.emit("socketErrorResponse", data);
+        }
+
+        const user = data.user;
+        const classId = user.classId;
+
+        try {
+            const rooms = await RoomSchemaModel.find({ classId }).populate("ownerId subjectId chapterId lessonId");
+
+            socket.emit("availableRoomsList", {
+                message: "✅ تم جلب الرومات المتاحة بنجاح",
+                rooms
+            });
+        } catch (error) {
+            console.error("❌ خطأ أثناء جلب الرومات:", error);
+            socket.emit("socketErrorResponse", {
+                message: "❌ حدث خطأ أثناء جلب الرومات المتاحة",
+                error: error.message
+            });
+        }
+    });
+};
