@@ -743,38 +743,99 @@ export const handleRoomCreation = (socket) => {
             });
         }
     });
-
-    // 🛑 تنظيف عند فصل الاتصال
-    socket.on("disconnect", async () => {
-        for (const [roomId, room] of availableRooms) {
-            const index = room.users.findIndex((u) => u.socketId === socket.id);
-            if (index !== -1) {
-                const userId = room.users[index].userId;
-
-                // 1. حذف من الذاكرة
-                room.users.splice(index, 1);
-
-                if (room.users.length === 0) {
-                    availableRooms.delete(roomId);
-                }
-
-                // ✅ 2. حذف من قاعدة البيانات
-                await RoomSchemaModel.updateOne(
-                    { roomId },
-                    { $pull: { users: { userId } } }
-                );
-
-                console.log(`👋 تم إزالة المستخدم ${userId} من الروم ${roomId} بعد الانفصال`);
-                break;
-            }
-        }
-    });
 };
 
 export { availableRooms };
-  
 
 
+
+// export const handleJoinRoom = (socket) => {
+//     socket.on("joinRoom", async ({ roomId }) => {
+//         try {
+//             const { data } = await authenticationSocket({ socket });
+
+//             if (!data.valid) {
+//                 return socket.emit("socketErrorResponse", data);
+//             }
+
+//             const user = data.user;
+//             const userId = user._id.toString();
+
+//             const room = await RoomSchemaModel.findOne({ roomId });
+
+//             if (!room) {
+//                 return socket.emit("socketErrorResponse", {
+//                     message: "❌ الروم غير موجودة",
+//                     status: 404,
+//                 });
+//             }
+
+//             // هل تم حظره؟
+//             const banned = room.bannedUsers.find(
+//                 (u) => u.userId.toString() === userId && u.bannedUntil > new Date()
+//             );
+
+//             if (banned) {
+//                 return socket.emit("socketErrorResponse", {
+//                     message: "⛔️ لقد تم حظرك مؤقتًا من هذه الروم",
+//                     status: 403,
+//                 });
+//             }
+
+//             // هل هو بالفعل داخل الروم؟
+//             const alreadyIn = room.users.find((u) => u.userId.toString() === userId);
+//             if (alreadyIn) {
+//                 return socket.emit("socketErrorResponse", {
+//                     message: "✅ أنت بالفعل داخل الروم",
+//                     status: 200,
+//                 });
+//             }
+
+//             // هل الروم ممتلئة؟
+//             if (room.users.length >= 5) {
+//                 return socket.emit("socketErrorResponse", {
+//                     message: "❌ الروم ممتلئة (الحد الأقصى 5 أشخاص)",
+//                     status: 403,
+//                 });
+//             }
+
+//             // ضيف المستخدم في الروم
+//             room.users.push({ userId });
+//             await room.save();
+
+//             // انضم للروم socket.io
+//             socket.join(roomId);
+
+//             console.log(`✅ ${user.name} انضم إلى الروم: ${roomId}`);
+
+//             // إعلام باقي الأعضاء
+//             socket.to(roomId).emit("newUserJoined", {
+//                 userId,
+//                 name: user.name,
+//             });
+
+//             // الرد على المستخدم نفسه
+//             socket.emit("joinedRoomSuccessfully", {
+//                 message: "✅ تم الانضمام للروم بنجاح",
+//                 roomId,
+//                 users: room.users,
+//                 subjectId: room.subjectId,
+//                 chapterId: room.chapterId,
+//                 lessonId: room.lessonId,
+//                 ownerId: room.ownerId,
+//                 roomName: room.roomName,
+//             });
+
+//         } catch (err) {
+//             console.error(err);
+//             socket.emit("socketErrorResponse", {
+//                 message: "❌ خطأ أثناء محاولة الانضمام للروم",
+//                 error: err.message,
+//                 status: 500,
+//             });
+//         }
+//     });
+// };
 
 export const handleJoinRoom = (socket) => {
     socket.on("joinRoom", async ({ roomId }) => {
@@ -797,7 +858,6 @@ export const handleJoinRoom = (socket) => {
                 });
             }
 
-            // هل تم حظره؟
             const banned = room.bannedUsers.find(
                 (u) => u.userId.toString() === userId && u.bannedUntil > new Date()
             );
@@ -809,7 +869,6 @@ export const handleJoinRoom = (socket) => {
                 });
             }
 
-            // هل هو بالفعل داخل الروم؟
             const alreadyIn = room.users.find((u) => u.userId.toString() === userId);
             if (alreadyIn) {
                 return socket.emit("socketErrorResponse", {
@@ -818,7 +877,6 @@ export const handleJoinRoom = (socket) => {
                 });
             }
 
-            // هل الروم ممتلئة؟
             if (room.users.length >= 5) {
                 return socket.emit("socketErrorResponse", {
                     message: "❌ الروم ممتلئة (الحد الأقصى 5 أشخاص)",
@@ -826,22 +884,18 @@ export const handleJoinRoom = (socket) => {
                 });
             }
 
-            // ضيف المستخدم في الروم
             room.users.push({ userId });
             await room.save();
 
-            // انضم للروم socket.io
             socket.join(roomId);
 
             console.log(`✅ ${user.name} انضم إلى الروم: ${roomId}`);
 
-            // إعلام باقي الأعضاء
             socket.to(roomId).emit("newUserJoined", {
                 userId,
                 name: user.name,
             });
 
-            // الرد على المستخدم نفسه
             socket.emit("joinedRoomSuccessfully", {
                 message: "✅ تم الانضمام للروم بنجاح",
                 roomId,
@@ -860,6 +914,32 @@ export const handleJoinRoom = (socket) => {
                 error: err.message,
                 status: 500,
             });
+        }
+    });
+
+    // ✅ هنا نقلنا disconnect
+    socket.on("disconnect", async () => {
+        for (const [roomId, room] of availableRooms) {
+            const index = room.users.findIndex((u) => u.socketId === socket.id);
+            if (index !== -1) {
+                const userId = room.users[index].userId;
+
+                // حذف من الذاكرة
+                room.users.splice(index, 1);
+
+                if (room.users.length === 0) {
+                    availableRooms.delete(roomId);
+                }
+
+                // حذف من قاعدة البيانات
+                await RoomSchemaModel.updateOne(
+                    { roomId },
+                    { $pull: { users: { userId } } }
+                );
+
+                console.log(`👋 تم إزالة المستخدم ${userId} من الروم ${roomId} بعد الانفصال`);
+                break;
+            }
         }
     });
 };
