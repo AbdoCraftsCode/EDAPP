@@ -858,6 +858,13 @@ export const handleJoinRoom = (socket) => {
                 });
             }
 
+
+            // ✅ تم إضافة الفلترة التلقائية هنا
+            room.bannedUsers = room.bannedUsers.filter(
+                (u) => u.bannedUntil > new Date()
+            );
+            await room.save();
+
             const banned = room.bannedUsers.find(
                 (u) => u.userId.toString() === userId && u.bannedUntil > new Date()
             );
@@ -1026,6 +1033,84 @@ export const handleAvailableRoomsByClass = (socket) => {
             socket.emit("socketErrorResponse", {
                 message: "❌ حدث خطأ أثناء جلب الرومات المتاحة",
                 error: error.message
+            });
+        }
+    });
+};
+
+export const handleKickUserFromRoom = (socket) => {
+    socket.on("kickUserFromRoom", async ({ roomId, targetUserId }) => {
+        try {
+            const { data } = await authenticationSocket({ socket });
+
+            if (!data.valid) {
+                return socket.emit("socketErrorResponse", data);
+            }
+
+            const requester = data.user;
+            const requesterId = requester._id.toString();
+
+            // جلب الروم
+            const room = await RoomSchemaModel.findOne({ roomId });
+
+            if (!room) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ الروم غير موجودة",
+                    status: 404,
+                });
+            }
+
+            // التأكد من أن صاحب الروم هو اللي بيطرد
+            if (room.ownerId.toString() !== requesterId) {
+                return socket.emit("socketErrorResponse", {
+                    message: "🚫 غير مصرح لك بطرد المستخدمين",
+                    status: 403,
+                });
+            }
+
+            // حظر لمدة 24 ساعة
+            const bannedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            room.bannedUsers.push({ userId: targetUserId, bannedUntil });
+
+            // حذف من قاعدة البيانات
+            room.users = room.users.filter((u) => u.userId.toString() !== targetUserId);
+            await room.save();
+
+            // حذف من الذاكرة
+            const memRoom = availableRooms.get(roomId);
+            if (memRoom) {
+                memRoom.users = memRoom.users.filter((u) => u.userId !== targetUserId);
+            }
+
+            // إخراج المستخدم من الروم socket.io
+            const targetSocket = memRoom?.users?.find(u => u.userId === targetUserId)?.socketId;
+            if (targetSocket) {
+                socket.to(targetSocket).emit("kickedFromRoom", {
+                    message: "🚫 تم طردك من الروم لمدة 24 ساعة"
+                });
+
+                socket.to(targetSocket).socketsLeave(roomId);
+            }
+
+            // إعلام كل الموجودين في الروم
+            socket.to(roomId).emit("userKickedNotification", {
+                message: `🚫 تم طرد مستخدم من الروم بواسطة ${requester.name}`,
+                targetUserId,
+            });
+
+            // إعلام صاحب الروم بنجاح الطرد
+            socket.emit("userKickedSuccess", {
+                message: "✅ تم طرد المستخدم بنجاح وحظره لمدة 24 ساعة"
+            });
+
+            console.log(`🚫 تم طرد المستخدم ${targetUserId} من الروم ${roomId}`);
+
+        } catch (err) {
+            console.error(err);
+            socket.emit("socketErrorResponse", {
+                message: "❌ حدث خطأ أثناء محاولة الطرد",
+                error: err.message,
+                status: 500,
             });
         }
     });
