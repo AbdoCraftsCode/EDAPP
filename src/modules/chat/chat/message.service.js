@@ -896,7 +896,8 @@ export const handleJoinRoom = (socket) => {
 
             socket.join(roomId);
 
-            console.log(`✅ ${user.name} انضم إلى الروم: ${roomId}`);
+            console.log(`✅ ${user.username || user.name || "مستخدم"} انضم إلى الروم: ${roomId}`);
+
 
             socket.to(roomId).emit("newUserJoined", {
                 userId,
@@ -1038,6 +1039,10 @@ export const handleAvailableRoomsByClass = (socket) => {
     });
 };
 
+
+
+
+
 export const handleKickUserFromRoom = (socket) => {
     socket.on("kickUserFromRoom", async ({ roomId, targetUserId }) => {
         try {
@@ -1109,6 +1114,74 @@ export const handleKickUserFromRoom = (socket) => {
             console.error(err);
             socket.emit("socketErrorResponse", {
                 message: "❌ حدث خطأ أثناء محاولة الطرد",
+                error: err.message,
+                status: 500,
+            });
+        }
+    });
+};
+
+
+export const handleLeaveRoom = (socket) => {
+    socket.on("leaveRoom", async ({ roomId }) => {
+        try {
+            const { data } = await authenticationSocket({ socket });
+
+            if (!data.valid) {
+                return socket.emit("socketErrorResponse", data);
+            }
+
+            const user = data.user;
+            const userId = user._id.toString();
+
+            const room = await RoomSchemaModel.findOne({ roomId });
+
+            if (!room) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ الروم غير موجودة",
+                    status: 404,
+                });
+            }
+
+            // 🧾 حذف المستخدم من قاعدة البيانات
+            const dbResult = await RoomSchemaModel.updateOne(
+                { roomId },
+                { $pull: { users: { userId } } }
+            );
+
+            // 🧠 حذف من الذاكرة المؤقتة
+            if (availableRooms.has(roomId)) {
+                const memoryRoom = availableRooms.get(roomId);
+                memoryRoom.users = memoryRoom.users.filter(
+                    (u) => u.userId !== userId
+                );
+
+                if (memoryRoom.users.length === 0) {
+                    availableRooms.delete(roomId);
+                }
+            }
+
+            // الخروج من الغرفة فعليًا
+            socket.leave(roomId);
+
+            // إعلام باقي الأعضاء
+            socket.to(roomId).emit("userLeftRoom", {
+                userId,
+                name: user.name || user.username,
+            });
+
+            // تأكيد للمستخدم
+            socket.emit("leftRoomSuccessfully", {
+                message: "✅ تم الخروج من الروم بنجاح",
+                roomId,
+            });
+
+            console.log(`👋 ${user.name || user.username} خرج من الروم ${roomId}`);
+
+        } catch (err) {
+            console.error("❌ خطأ في leaveRoom:", err);
+            socket.emit("socketErrorResponse", {
+                message: "❌ خطأ أثناء محاولة الخروج من الروم",
                 error: err.message,
                 status: 500,
             });

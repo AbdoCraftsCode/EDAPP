@@ -1305,6 +1305,8 @@ export const getAllRanks = asyncHandelr(async (req, res, next) => {
 
 // utils/countryPricing.js
 
+
+
 // import { io } from "socket.io-client";
 
 // const socket = io("http://localhost:3000", {
@@ -1320,9 +1322,9 @@ export const getAllRanks = asyncHandelr(async (req, res, next) => {
 //     // ✅ هنا بيتم إنشاء الروم
 //     socket.emit("createRoom", {
 //         roomName: "روم تجربة الآن",
-//         subjectId: "math101",
-//         chapterId: "ch1",
-//         lessonId: "ls1"
+//         subjectId: "6877ea4daa66641fb6030188", // استبدل بـ ObjectID صالح
+//         chapterId: "6877ea4daa66641fb6030189",
+//         lessonId: "6877ea4daa66641fb6030190"
 //     });
 // });
 
@@ -1337,4 +1339,3 @@ export const getAllRanks = asyncHandelr(async (req, res, next) => {
 // socket.on("disconnect", () => {
 //     console.log("🔌 Disconnected from server");
 // });
-
