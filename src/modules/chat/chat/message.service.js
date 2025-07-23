@@ -954,67 +954,74 @@ export const handleJoinRoom = (socket) => {
 };
 
 
-// export const handleRoomEvents = (io, socket) => {
-//     socket.on("getRoomQuestions", async ({ roomId }) => {
-//         try {
-//             const { data } = await authenticationSocket({ socket });
-//             if (!data.valid) {
-//                 return socket.emit("socketErrorResponse", data);
-//             }
+export const handleRoomEvents = (socket) => {
+    socket.on("getRoomQuestions", async ({ roomId }) => {
+        try {
+            const { data } = await authenticationSocket({ socket });
 
-//             const userId = data.user._id;
+            if (!data.valid) {
+                return socket.emit("socketErrorResponse", data);
+            }
 
-//             const room = await RoomSchemaModel.findOne({ roomId });
-//             if (!room) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ لم يتم العثور على الروم",
-//                 });
-//             }
+            const userId = data.user._id;
 
-//             // التحقق من أن الشخص هو صاحب الروم
-//             if (room.ownerId.toString() !== userId.toString()) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ ليس لديك صلاحية لجلب الأسئلة"
-//                 });
-//             }
+            // 🧠 التأكد من وجود الروم
+            const room = await RoomSchemaModel.findOne({ roomId });
+            if (!room) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ لم يتم العثور على الروم",
+                });
+            }
 
-//             // التحقق من وجود بيانات الدرس
-//             if (!room.lessonId) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ لا يمكن جلب الأسئلة بدون lessonId"
-//                 });
-//             }
+            // 🔐 التأكد من أن المستخدم هو صاحب الروم
+            if (room.ownerId.toString() !== userId.toString()) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ ليس لديك صلاحية لجلب الأسئلة"
+                });
+            }
 
-//             // 🔍 جلب الأسئلة من ExamModel باستخدام lessonId
-//             const exam = await ExamModel.findOne({ lessonId: room.lessonId });
-//             if (!exam || !exam.questions.length) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ لا يوجد امتحان مسجل لهذا الدرس"
-//                 });
-//             }
+            // ⚠️ التأكد من وجود lessonId
+            if (!room.lessonId) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ لا يمكن جلب الأسئلة بدون lessonId"
+                });
+            }
 
-//             // 🔄 اختيار 10 أسئلة عشوائية
-//             const shuffled = exam.questions.sort(() => 0.5 - Math.random());
-//             const questions = shuffled.slice(0, 10);
+            // 📚 جلب الامتحان
+            const exam = await ExamModel.findOne({ lessonId: room.lessonId });
+            if (!exam || !exam.questions.length) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ لا يوجد امتحان مسجل لهذا الدرس"
+                });
+            }
 
-//             console.log("✅ تم جلب الأسئلة بنجاح:", questions.length);
+            // 🔀 اختيار عشوائي لـ 10 أسئلة
+            const shuffled = exam.questions.sort(() => 0.5 - Math.random());
+            const questions = shuffled.slice(0, 10);
 
-//             // 📨 إرسال الأسئلة لكل من في الغرفة
-//             io.to(roomId).emit("roomQuestions", {
-//                 questions,
-//                 message: "✅ تم إرسال الأسئلة للجميع"
-//             });
+            console.log("✅ تم جلب الأسئلة بنجاح:", questions.length);
 
-//         } catch (err) {
-//             console.error("❌ خطأ أثناء جلب الأسئلة:", err);
-//             socket.emit("socketErrorResponse", {
-//                 message: "❌ حدث خطأ أثناء جلب الأسئلة",
-//                 error: err.message
-//             });
-//         }
-//     });
-// };
+            // 📤 إرسال الأسئلة للجميع في الروم (ما عدا المرسل)
+            socket.to(roomId).emit("roomQuestions", {
+                questions,
+                message: "✅ تم إرسال الأسئلة للجميع"
+            });
 
+            // ⬅️ إرسال نسخة للمرسل نفسه أيضًا (اختياري)
+            socket.emit("roomQuestions", {
+                questions,
+                message: "✅ تم إرسال الأسئلة لك"
+            });
+
+        } catch (err) {
+            console.error("❌ خطأ أثناء جلب الأسئلة:", err);
+            socket.emit("socketErrorResponse", {
+                message: "❌ حدث خطأ أثناء جلب الأسئلة",
+                error: err.message
+            });
+        }
+    });
+}
 export const handleAvailableRoomsByClass = (socket) => {
     socket.on("getAvailableRooms", async () => {
         const { data } = await authenticationSocket({ socket });
