@@ -1,5 +1,6 @@
 // models/Room.model.js
 import mongoose from 'mongoose';
+import { questionSchema } from './question.model.js';
 
 const RoomSchema = new mongoose.Schema({
     roomId: { type: String, required: true, unique: true },
@@ -9,6 +10,11 @@ const RoomSchema = new mongoose.Schema({
     chapterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chapter' },
     lessonId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' },
     classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
+    questions: {
+        type: [questionSchema],
+        default: [],
+    },
+
     users: [
         {
             userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
