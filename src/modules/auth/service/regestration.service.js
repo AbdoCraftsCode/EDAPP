@@ -1264,6 +1264,22 @@ export const adduser = asyncHandelr(async (req, res, next) => {
 
 
 
+export const getUserFriends = asyncHandelr(async (req, res, next) => {
+    const userId = req.user._id;
+
+    const user = await Usermodel.findById(userId)
+        .populate("friends", "username profilePic")
+        .select("friends");
+
+    if (!user) {
+        return next(new Error("المستخدم غير موجود", { cause: 404 }));
+    }
+
+    return res.json({
+        success: true,
+        friends: user.friends,
+    });
+});
 
 
 

@@ -10,6 +10,17 @@ const ChatSchema = new Schema({
         ref: 'User',
         required: true
     }],
+    mainUser: {
+        type: Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    subpartisipant: {
+        type: Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+
     messages: [{
         _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
         message: { type: String, default: null },
@@ -48,3 +59,5 @@ export const ChatModel = mongoose.models.Chat || model('Chat', ChatSchema);
 // }, { timestamps: true });
 
 // export const ChatModel = mongoose.models.Chat || model('Chat', ChatSchema);
+
+

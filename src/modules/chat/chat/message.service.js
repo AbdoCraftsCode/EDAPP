@@ -13,6 +13,69 @@ import { getIo } from "../chat.socket.controller.js";
 
 
 
+export const sendMessage2 = (socket) => {
+    return socket.on("sendMessage2", async (messageData) => {
+        try {
+            const { data } = await authenticationSocket({ socket });
+
+            if (!data.valid) {
+                return socket.emit("socketErrorResponse", data);
+            }
+
+            const userId = data.user._id.toString();
+            const { destId, message } = messageData;
+
+            // التحقق من صحة الـ ObjectId
+            if (!mongoose.Types.ObjectId.isValid(destId)) {
+                return socket.emit("socketErrorResponse", {
+                    message: "معرف المستخدم الهدف غير صالح"
+                });
+            }
+
+            const chat = await dbservice.findOneAndUpdate({
+                model: ChatModel,
+                filter: {
+                    $or: [
+                        {
+                            mainUser: new mongoose.Types.ObjectId(userId),
+                            subpartisipant: new mongoose.Types.ObjectId(destId)
+                        },
+                        {
+                            mainUser: new mongoose.Types.ObjectId(destId),
+                            subpartisipant: new mongoose.Types.ObjectId(userId)
+                        }
+                    ]
+                },
+                data: {
+                    $push: {
+                        messages: {
+                            text: message,
+                            senderId: new mongoose.Types.ObjectId(userId)
+                        }
+                    }
+                },
+                options: { new: true, upsert: true }
+            });
+
+            // إرسال الرسالة للطرف الآخر
+            const receiverSocket = scketConnections.get(destId);
+            if (receiverSocket) {
+                socket.to(receiverSocket).emit("receiveMessage2", {
+                    message: message,
+                    senderId: userId
+                });
+            }
+
+            socket.emit("successMessage2", { message });
+
+        } catch (error) {
+            console.error('Error in sendMessage:', error);
+            socket.emit("socketErrorResponse", {
+                message: "حدث خطأ أثناء إرسال الرسالة"
+            });
+        }
+    });
+};
 
 
 
@@ -138,7 +201,7 @@ export const sendMessage = (socket) => {
                 fileUrl
             } = messageData;
 
-            // لازم على الأقل حاجة واحدة
+            
             const nothingSent = [message, voiceUrl, imageUrl, fileUrl]
                 .every(val => !val || (typeof val === "string" && val.trim() === ""));
 
@@ -149,7 +212,7 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // جلب أو إنشاء الشات
+        
             let chat = await ChatModel.findOne();
             if (!chat) {
                 chat = await ChatModel.create({
@@ -158,7 +221,7 @@ export const sendMessage = (socket) => {
                 });
             }
 
-            // إضافة المستخدم للمشاركين
+           
             if (!chat.participants.includes(user._id)) {
                 chat.participants.push(user._id);
             }

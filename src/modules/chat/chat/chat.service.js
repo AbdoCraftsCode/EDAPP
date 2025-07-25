@@ -58,3 +58,49 @@ export const findGroupChat = asyncHandelr(async (req, res, next) => {
 //         messages: chat.messages
 //     });
 // });
+
+
+export const findonechat2 = asyncHandelr(async (req, res, next) => {
+
+    const { destId } = req.params;
+    const chat = await dbservice.findOneAndUpdate({
+        model: ChatModel,
+
+        filter: {
+
+            $or: [
+                {
+                    mainUser: req.user._id,
+                    subpartisipant: destId,
+
+
+                },
+                {
+                    mainUser: destId,
+                    subpartisipant: req.user._id,
+
+                }
+
+
+            ]
+        },
+        populate: [
+            {
+                path: "mainUser"
+            },
+            {
+                path: "subpartisipant"
+            },
+
+            {
+                path: "messages.senderId"
+            }
+
+        ]
+
+    })
+
+    successresponse(res, { chat })
+
+
+})

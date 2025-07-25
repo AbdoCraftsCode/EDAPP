@@ -937,7 +937,7 @@ export const getMyExamStats = async (req, res) => {
             }
         ]);
 
-        const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender");
+        const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender _id");
 
         if (!user) {
             return res.status(404).json({ message: "❌ لم يتم العثور على الطالب" });
@@ -948,6 +948,7 @@ export const getMyExamStats = async (req, res) => {
             studentEmail: user.email || "",
             profilePic: user.profilePic || "",
             classId: user.classId || "",
+            _id: user._id || "",
             userId: user.userId || "",
             gender: user.gender || "",
             totalScore: result[0]?.totalScore || 0,
