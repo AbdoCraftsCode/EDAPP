@@ -10,6 +10,7 @@ import RoomSchemaModel from "../../../DB/models/RoomSchema.model.js";
 import examresultModel from "../../../DB/models/examresult.model.js";
 import ExamModel from "../../../DB/models/exams.model.js";
 import { getIo } from "../chat.socket.controller.js";
+import ChatModell from "../../../DB/models/chat2.model.js";
 
 
 
@@ -33,7 +34,7 @@ export const sendMessage2 = (socket) => {
             }
 
             const chat = await dbservice.findOneAndUpdate({
-                model: ChatModel,
+                model: ChatModell,
                 filter: {
                     $or: [
                         {
@@ -49,13 +50,19 @@ export const sendMessage2 = (socket) => {
                 data: {
                     $push: {
                         messages: {
-                            text: message,
+                            message,
                             senderId: new mongoose.Types.ObjectId(userId)
                         }
+                    },
+                    // 👇 هنا الإضافة المهمة 👇
+                    $setOnInsert: {
+                        mainUser: userId,
+                        subpartisipant: destId
                     }
                 },
                 options: { new: true, upsert: true }
             });
+
 
             // إرسال الرسالة للطرف الآخر
             const receiverSocket = scketConnections.get(destId);
@@ -989,8 +996,10 @@ export const handleJoinRoom = (socket) => {
 
             socket.to(roomId).emit("newUserJoined", {
                 userId,
-                name: user.name,
+                username: user.username,
+                profilePic: user.profilePic,
             });
+
 
             // جلب تفاصيل الروم وتحديث الجميع
             const updatedRoom = await RoomSchemaModel.findOne({ roomId })

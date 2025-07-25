@@ -3,8 +3,9 @@ import { asyncHandelr } from "../../../utlis/response/error.response.js";
 import { successresponse } from "../../../utlis/response/success.response.js";
 import * as dbservice from "../../../DB/dbservice.js"
 import { ChatModel } from "../../../DB/models/chaatmodel.js";
+import ChatModell from "../../../DB/models/chat2.model.js";
 
-
+import mongoose from "mongoose";
 
 
 
@@ -61,46 +62,25 @@ export const findGroupChat = asyncHandelr(async (req, res, next) => {
 
 
 export const findonechat2 = asyncHandelr(async (req, res, next) => {
-
     const { destId } = req.params;
-    const chat = await dbservice.findOneAndUpdate({
-        model: ChatModel,
 
-        filter: {
+    const userId = new mongoose.Types.ObjectId(req.user._id);
+    const destObjectId = new mongoose.Types.ObjectId(destId);
 
-            $or: [
-                {
-                    mainUser: req.user._id,
-                    subpartisipant: destId,
-
-
-                },
-                {
-                    mainUser: destId,
-                    subpartisipant: req.user._id,
-
-                }
-
-
-            ]
-        },
-        populate: [
-            {
-                path: "mainUser"
-            },
-            {
-                path: "subpartisipant"
-            },
-
-            {
-                path: "messages.senderId"
-            }
-
+    const chat = await ChatModell.findOne({
+        $or: [
+            { mainUser: userId, subpartisipant: destObjectId },
+            { mainUser: destObjectId, subpartisipant: userId }
         ]
-
     })
+        .populate("mainUser")
+        .populate("subpartisipant")
+        .populate("messages.senderId");
 
-    successresponse(res, { chat })
+    if (!chat) {
+        console.log("🚫 لم يتم العثور على محادثة بين:", userId, "و", destObjectId);
+        return successresponse(res, { chat: null });
+    }
 
-
-})
+    successresponse(res, { chat });
+});
