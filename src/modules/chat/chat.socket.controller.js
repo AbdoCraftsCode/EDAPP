@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
 import { logoutSocket, regiserSocket } from "./chat/chat.auth.service.js";
-import { handleAvailableRoomsByClass, handleJoinRoom, handleKickUserFromRoom, handleLeaveRoom, handleMatching, handleRoomCreation,  handleRoomEvents,  handleVoiceCall, sendMessage, updateRoomLesson } from "./chat/message.service.js";
+import { handleAvailableRoomsByClass, handleGetRoomDetailsById, handleJoinRoom, handleKickUserFromRoom, handleLeaveRoom, handleMatching, handleRoomCreation,  handleRoomEvents,  handleVoiceCall, sendMessage, updateRoomLesson } from "./chat/message.service.js";
 import { authenticationSocket } from "../../middlewere/auth.socket.middlewere.js";
 
 
@@ -35,6 +35,7 @@ export const runIo = (httpServer) => {
         await handleLeaveRoom(socket);
         await handleRoomEvents(socket); 
         await updateRoomLesson(socket); 
+        await handleGetRoomDetailsById(socket); 
         await handleJoinRoom(socket);
     });
 

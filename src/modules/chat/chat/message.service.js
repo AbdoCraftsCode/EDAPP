@@ -751,20 +751,18 @@ export { availableRooms };
 
 
 
-// export const handleJoinRoom = (socket) => {
+
+
+//     export const handleJoinRoom = (socket) => {
 //     socket.on("joinRoom", async ({ roomId }) => {
 //         try {
 //             const { data } = await authenticationSocket({ socket });
-
-//             if (!data.valid) {
-//                 return socket.emit("socketErrorResponse", data);
-//             }
+//             if (!data.valid) return socket.emit("socketErrorResponse", data);
 
 //             const user = data.user;
 //             const userId = user._id.toString();
 
 //             const room = await RoomSchemaModel.findOne({ roomId });
-
 //             if (!room) {
 //                 return socket.emit("socketErrorResponse", {
 //                     message: "❌ الروم غير موجودة",
@@ -772,100 +770,19 @@ export { availableRooms };
 //                 });
 //             }
 
-//             // هل تم حظره؟
-//             const banned = room.bannedUsers.find(
-//                 (u) => u.userId.toString() === userId && u.bannedUntil > new Date()
-//             );
-
-//             if (banned) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "⛔️ لقد تم حظرك مؤقتًا من هذه الروم",
-//                     status: 403,
-//                 });
-//             }
-
-//             // هل هو بالفعل داخل الروم؟
-//             const alreadyIn = room.users.find((u) => u.userId.toString() === userId);
-//             if (alreadyIn) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "✅ أنت بالفعل داخل الروم",
-//                     status: 200,
-//                 });
-//             }
-
-//             // هل الروم ممتلئة؟
-//             if (room.users.length >= 5) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ الروم ممتلئة (الحد الأقصى 5 أشخاص)",
-//                     status: 403,
-//                 });
-//             }
-
-//             // ضيف المستخدم في الروم
-//             room.users.push({ userId });
-//             await room.save();
-
-//             // انضم للروم socket.io
-//             socket.join(roomId);
-
-//             console.log(`✅ ${user.name} انضم إلى الروم: ${roomId}`);
-
-//             // إعلام باقي الأعضاء
-//             socket.to(roomId).emit("newUserJoined", {
-//                 userId,
-//                 name: user.name,
-//             });
-
-//             // الرد على المستخدم نفسه
-//             socket.emit("joinedRoomSuccessfully", {
-//                 message: "✅ تم الانضمام للروم بنجاح",
-//                 roomId,
-//                 users: room.users,
-//                 subjectId: room.subjectId,
-//                 chapterId: room.chapterId,
-//                 lessonId: room.lessonId,
-//                 ownerId: room.ownerId,
-//                 roomName: room.roomName,
-//             });
-
-//         } catch (err) {
-//             console.error(err);
-//             socket.emit("socketErrorResponse", {
-//                 message: "❌ خطأ أثناء محاولة الانضمام للروم",
-//                 error: err.message,
-//                 status: 500,
-//             });
-//         }
-//     });
-// };
-
-// export const handleJoinRoom = (socket) => {
-//     socket.on("joinRoom", async ({ roomId }) => {
-//         try {
-//             const { data } = await authenticationSocket({ socket });
-
-//             if (!data.valid) {
-//                 return socket.emit("socketErrorResponse", data);
-//             }
-
-//             const user = data.user;
-//             const userId = user._id.toString();
-
-//             const room = await RoomSchemaModel.findOne({ roomId });
-
-//             if (!room) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ الروم غير موجودة",
-//                     status: 404,
-//                 });
-//             }
-
-
-//             // ✅ تم إضافة الفلترة التلقائية هنا
+//             // ✅ فلترة الحظر المؤقت
 //             room.bannedUsers = room.bannedUsers.filter(
 //                 (u) => u.bannedUntil > new Date()
 //             );
 //             await room.save();
+//             const updatedRoom = await RoomSchemaModel.findOne({ roomId }).populate("users.userId", "name avatar");
+//             const updatedUsers = updatedRoom.users.map(u => ({
+//                 userId: u.userId._id,
+//                 name: u.userId.name,
+//                 avatar: u.userId.avatar,
+//             }));
+//             socket.to(roomId).emit("roomUsersUpdated", updatedUsers);
+
 
 //             const banned = room.bannedUsers.find(
 //                 (u) => u.userId.toString() === userId && u.bannedUntil > new Date()
@@ -895,17 +812,17 @@ export { availableRooms };
 
 //             room.users.push({ userId });
 //             await room.save();
-
 //             socket.join(roomId);
 
-//             console.log(`✅ ${user.username || user.name || "مستخدم"} انضم إلى الروم: ${roomId}`);
+//             console.log(`✅ ${user.username || user.name} انضم إلى الروم: ${roomId}`);
 
-
+//             // إعلام الموجودين في الروم
 //             socket.to(roomId).emit("newUserJoined", {
 //                 userId,
 //                 name: user.name,
 //             });
 
+//             // الرد للمستخدم
 //             socket.emit("joinedRoomSuccessfully", {
 //                 message: "✅ تم الانضمام للروم بنجاح",
 //                 roomId,
@@ -917,8 +834,21 @@ export { availableRooms };
 //                 roomName: room.roomName,
 //             });
 
+//             // ✅ جلب الأسئلة تلقائيًا للمستخدم الجديد
+//             if (room.lessonId) {
+//                 const exam = await ExamModel.findOne({ lessonId: room.lessonId });
+//                 if (exam && exam.questions.length) {
+//                     const shuffled = exam.questions.sort(() => 0.5 - Math.random());
+//                     const questions = shuffled.slice(0, 10);
+//                     socket.emit("roomQuestions", {
+//                         questions,
+//                         message: "✅ هذه هي الأسئلة الخاصة بالروم",
+//                     });
+//                 }
+//             }
+
 //         } catch (err) {
-//             console.error(err);
+//             console.error("❌ Error in joinRoom:", err);
 //             socket.emit("socketErrorResponse", {
 //                 message: "❌ خطأ أثناء محاولة الانضمام للروم",
 //                 error: err.message,
@@ -926,52 +856,34 @@ export { availableRooms };
 //             });
 //         }
 //     });
-
-//     // ✅ هنا نقلنا disconnect
-//     socket.on("disconnect", async () => {
-//         for (const [roomId, room] of availableRooms) {
-//             const index = room.users.findIndex((u) => u.socketId === socket.id);
-//             if (index !== -1) {
-//                 const userId = room.users[index].userId;
-
-//                 // حذف من الذاكرة
-//                 room.users.splice(index, 1);
-
-//                 if (room.users.length === 0) {
-//                     availableRooms.delete(roomId);
-//                 }
-
-//                 // حذف من قاعدة البيانات
-//                 await RoomSchemaModel.updateOne(
-//                     { roomId },
-//                     { $pull: { users: { userId } } }
-//                 );
-
-//                 console.log(`👋 تم إزالة المستخدم ${userId} من الروم ${roomId} بعد الانفصال`);
-//                 break;
-//             }
-//         }
-//     });
 // };
+    
 
-    export const handleJoinRoom = (socket) => {
+
+    
+export const handleJoinRoom = (socket) => {
     socket.on("joinRoom", async ({ roomId }) => {
         try {
             const { data } = await authenticationSocket({ socket });
-            if (!data.valid) return socket.emit("socketErrorResponse", data);
+            if (!data.valid) {
+                console.log("❌ مصادقة غير صالحة:", data);
+                return socket.emit("socketErrorResponse", data);
+            }
 
             const user = data.user;
             const userId = user._id.toString();
+            console.log(`🔐 المستخدم ${user.username || user.name} يحاول الانضمام إلى الروم: ${roomId}`);
 
             const room = await RoomSchemaModel.findOne({ roomId });
             if (!room) {
+                console.log("❌ الروم غير موجودة");
                 return socket.emit("socketErrorResponse", {
                     message: "❌ الروم غير موجودة",
                     status: 404,
                 });
             }
 
-            // ✅ فلترة الحظر المؤقت
+            // فلترة الحظر المؤقت
             room.bannedUsers = room.bannedUsers.filter(
                 (u) => u.bannedUntil > new Date()
             );
@@ -980,8 +892,8 @@ export { availableRooms };
             const banned = room.bannedUsers.find(
                 (u) => u.userId.toString() === userId && u.bannedUntil > new Date()
             );
-
             if (banned) {
+                console.log("⛔️ مستخدم محظور مؤقتًا:", userId);
                 return socket.emit("socketErrorResponse", {
                     message: "⛔️ لقد تم حظرك مؤقتًا من هذه الروم",
                     status: 403,
@@ -990,6 +902,7 @@ export { availableRooms };
 
             const alreadyIn = room.users.find((u) => u.userId.toString() === userId);
             if (alreadyIn) {
+                console.log("🔁 المستخدم موجود بالفعل في الروم:", userId);
                 return socket.emit("socketErrorResponse", {
                     message: "✅ أنت بالفعل داخل الروم",
                     status: 200,
@@ -997,29 +910,62 @@ export { availableRooms };
             }
 
             if (room.users.length >= 5) {
+                console.log("❌ الروم ممتلئة:", roomId);
                 return socket.emit("socketErrorResponse", {
                     message: "❌ الروم ممتلئة (الحد الأقصى 5 أشخاص)",
                     status: 403,
                 });
             }
 
+            // ✅ انضمام فعلي
             room.users.push({ userId });
             await room.save();
             socket.join(roomId);
 
             console.log(`✅ ${user.username || user.name} انضم إلى الروم: ${roomId}`);
 
-            // إعلام الموجودين في الروم
             socket.to(roomId).emit("newUserJoined", {
                 userId,
                 name: user.name,
             });
 
-            // الرد للمستخدم
+            // جلب تفاصيل الروم وتحديث الجميع
+            const updatedRoom = await RoomSchemaModel.findOne({ roomId })
+                .populate("ownerId", "username profilePic")
+                .populate("users.userId", "username profilePic")
+                .populate("subjectId", "name")
+                .populate("chapterId", "title")
+                .populate("lessonId", "title");
+
+            const usersList = updatedRoom.users.map((u) => ({
+                userId: u.userId._id,
+                username: u.userId.username,
+                profilePic: u.userId.profilePic,
+            }));
+
+            const io = getIo();
+            const roomData = {
+                roomId: updatedRoom.roomId,
+                roomName: updatedRoom.roomName,
+                owner: {
+                    userId: updatedRoom.ownerId._id,
+                    username: updatedRoom.ownerId.username,
+                    profilePic: updatedRoom.ownerId.profilePic,
+                },
+                users: usersList,
+                subject: updatedRoom.subjectId?.name || null,
+                chapter: updatedRoom.chapterId?.title || null,
+                lesson: updatedRoom.lessonId?.title || null,
+            };
+
+            console.log("📡 إرسال roomDetailsUpdated:", JSON.stringify(roomData, null, 2));
+            io.in(roomId).emit("roomDetailsUpdated", roomData);
+
+            // ✅ رد للمستخدم نفسه
             socket.emit("joinedRoomSuccessfully", {
                 message: "✅ تم الانضمام للروم بنجاح",
                 roomId,
-                users: room.users,
+                users: usersList,
                 subjectId: room.subjectId,
                 chapterId: room.chapterId,
                 lessonId: room.lessonId,
@@ -1027,21 +973,24 @@ export { availableRooms };
                 roomName: room.roomName,
             });
 
-            // ✅ جلب الأسئلة تلقائيًا للمستخدم الجديد
+            // ✅ إرسال الأسئلة
             if (room.lessonId) {
                 const exam = await ExamModel.findOne({ lessonId: room.lessonId });
                 if (exam && exam.questions.length) {
                     const shuffled = exam.questions.sort(() => 0.5 - Math.random());
                     const questions = shuffled.slice(0, 10);
+                    console.log(`📘 تم إرسال ${questions.length} سؤال`);
                     socket.emit("roomQuestions", {
                         questions,
                         message: "✅ هذه هي الأسئلة الخاصة بالروم",
                     });
+                } else {
+                    console.log("⚠️ لا يوجد أسئلة في هذا الدرس");
                 }
             }
 
         } catch (err) {
-            console.error("❌ Error in joinRoom:", err);
+            console.error("❌ خطأ في joinRoom:", err);
             socket.emit("socketErrorResponse", {
                 message: "❌ خطأ أثناء محاولة الانضمام للروم",
                 error: err.message,
@@ -1050,64 +999,6 @@ export { availableRooms };
         }
     });
 };
-    
-// export const handleRoomEvents = (socket) => {
-//     socket.on("getRoomQuestions", async ({ roomId }) => {
-//         try {
-//             const { data } = await authenticationSocket({ socket });
-
-//             if (!data.valid) {
-//                 return socket.emit("socketErrorResponse", data);
-//             }
-
-//             const userId = data.user._id;
-
-//             const room = await RoomSchemaModel.findOne({ roomId });
-//             if (!room) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ لم يتم العثور على الروم",
-//                 });
-//             }
-
-//             if (room.ownerId.toString() !== userId.toString()) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ ليس لديك صلاحية لجلب الأسئلة"
-//                 });
-//             }
-
-//             if (!room.lessonId) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ لا يمكن جلب الأسئلة بدون lessonId"
-//                 });
-//             }
-
-//             const exam = await ExamModel.findOne({ lessonId: room.lessonId });
-//             if (!exam || !exam.questions.length) {
-//                 return socket.emit("socketErrorResponse", {
-//                     message: "❌ لا يوجد امتحان مسجل لهذا الدرس"
-//                 });
-//             }
-
-//             const shuffled = exam.questions.sort(() => 0.5 - Math.random());
-//             const questions = shuffled.slice(0, 10);
-
-//             console.log("✅ تم جلب الأسئلة بنجاح:", questions.length);
-
-//             const io = getIo();
-//             io.in(roomId).emit("roomQuestions", {
-//                 questions,
-//                 message: "✅ تم إرسال الأسئلة للجميع"
-//             });
-
-//         } catch (err) {
-//             console.error("❌ خطأ أثناء جلب الأسئلة:", err);
-//             socket.emit("socketErrorResponse", {
-//                 message: "❌ حدث خطأ أثناء جلب الأسئلة",
-//                 error: err.message
-//             });
-//         }
-//     });
-// };
 
 
 export const handleRoomEvents = (socket) => {
@@ -1415,6 +1306,60 @@ export const updateRoomLesson = (socket) => {
             socket.emit("socketErrorResponse", {
                 message: "❌ حدث خطأ أثناء تغيير الدرس",
                 error: err.message
+            });
+        }
+    });
+};
+
+
+
+
+
+export const handleGetRoomDetailsById = (socket) => {
+    socket.on("getRoomDetailsById", async ({ roomId }) => {
+        try {
+            const { data } = await authenticationSocket({ socket });
+            if (!data.valid) return socket.emit("socketErrorResponse", data);
+
+            const room = await RoomSchemaModel.findOne({ roomId })
+                .populate("ownerId", "username profilePic")
+                .populate("users.userId", "username profilePic")
+                .populate("subjectId", "name")
+                .populate("chapterId", "title")
+                .populate("lessonId", "title");
+
+            if (!room) {
+                return socket.emit("socketErrorResponse", {
+                    message: "❌ الروم غير موجودة",
+                });
+            }
+
+            // تجهيز البيانات للإرسال
+            const usersList = room.users.map((u) => ({
+                userId: u.userId._id,
+                username: u.userId.username,
+                profilePic: u.userId.profilePic,
+            }));
+
+            socket.emit("roomDetails", {
+                roomId: room.roomId,
+                roomName: room.roomName,
+                owner: {
+                    userId: room.ownerId._id,
+                    username: room.ownerId.username,
+                    profilePic: room.ownerId.profilePic,
+                },
+                users: usersList,
+                subject: room.subjectId?.name || null,
+                chapter: room.chapterId?.title || null,
+                lesson: room.lessonId?.title || null,
+            });
+
+        } catch (err) {
+            console.error("❌ Error in getRoomDetailsById:", err);
+            socket.emit("socketErrorResponse", {
+                message: "❌ فشل في جلب تفاصيل الروم",
+                error: err.message,
             });
         }
     });
