@@ -29,12 +29,20 @@ export const findGroupChat = asyncHandelr(async (req, res, next) => {
         return successresponse(res, { messages: [] });
     }
 
+    // فلترة الرسائل بحيث ترجع فقط المحتوى + senderId + _id
+    const simplifiedMessages = chat.messages.map(msg => ({
+        _id: msg._id,
+        senderId: msg.senderId?._id,
+        message: msg.message || null,
+        voiceUrl: msg.voiceUrl || null,
+        imageUrl: msg.imageUrl || null,
+        fileUrl: msg.fileUrl || null
+    }));
+
     successresponse(res, {
-        participants: chat.participants,
-        messages: chat.messages
+        messages: simplifiedMessages
     });
 });
-  
 
 
 
