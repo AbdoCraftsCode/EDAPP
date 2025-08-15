@@ -82,11 +82,14 @@ export const findonechat2 = asyncHandelr(async (req, res, next) => {
         return successresponse(res, { chat: null });
     }
 
-    // استخراج الرسائل بالشكل المطلوب
+    // استخراج الرسائل بالشكل المطلوب مع التوقيت والـ id
     const simplifiedMessages = chat.messages.map(msg => ({
+        _id: msg._id,
         message: msg.message,
-        senderId: msg.senderId._id
+        senderId: msg.senderId._id,
+        createdAt: msg.createdAt
     }));
 
     successresponse(res, simplifiedMessages);
 });
+
