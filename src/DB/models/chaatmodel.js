@@ -8,17 +8,17 @@ const ChatSchema = new Schema({
     participants: [{
         type: Types.ObjectId,
         ref: 'User',
-        required: true
+        // required: true
     }],
     mainUser: {
         type: Types.ObjectId,
         ref: 'User',
-        required: true
+        // required: true
     },
     subpartisipant: {
         type: Types.ObjectId,
         ref: 'User',
-        required: true
+        // required: true
     },
 
     messages: [{

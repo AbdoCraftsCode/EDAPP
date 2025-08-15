@@ -208,7 +208,16 @@ export const sendMessage = (socket) => {
                 fileUrl
             } = messageData;
 
-            
+            // ✅ طباعة ما تم استلامه
+            console.log("📨 استلام رسالة من المستخدم:", {
+                userId,
+                username: user.username,
+                message,
+                voiceUrl,
+                imageUrl,
+                fileUrl
+            });
+
             const nothingSent = [message, voiceUrl, imageUrl, fileUrl]
                 .every(val => !val || (typeof val === "string" && val.trim() === ""));
 
@@ -219,7 +228,6 @@ export const sendMessage = (socket) => {
                 });
             }
 
-        
             let chat = await ChatModel.findOne();
             if (!chat) {
                 chat = await ChatModel.create({
@@ -228,7 +236,6 @@ export const sendMessage = (socket) => {
                 });
             }
 
-           
             if (!chat.participants.includes(user._id)) {
                 chat.participants.push(user._id);
             }
@@ -276,6 +283,7 @@ export const sendMessage = (socket) => {
         }
     });
 };
+
   
 
 // const waitingUsers = [];
@@ -1174,7 +1182,7 @@ export const handleAvailableRoomsByClass = (socket) => {
 
 
 
-
+ 
 export const handleKickUserFromRoom = (socket) => {
     socket.on("kickUserFromRoom", async ({ roomId, targetUserId }) => {
         try {
@@ -1321,6 +1329,7 @@ export const handleKickUserFromRoom = (socket) => {
 //     });
 // };
 
+
 export const handleLeaveRoom = (socket) => {
     socket.on("leaveRoom", async ({ roomId }) => {
         try {
@@ -1333,6 +1342,9 @@ export const handleLeaveRoom = (socket) => {
             const user = data.user;
             const userId = user._id.toString();
 
+            // ✅ هنا نقدر نستخدم roomId
+            console.log("💬 المستخدمون في الروم قبل المغادرة:", getIo().sockets.adapter.rooms.get(roomId));
+
             const room = await RoomSchemaModel.findOne({ roomId });
 
             if (!room) {
@@ -1342,7 +1354,7 @@ export const handleLeaveRoom = (socket) => {
                 });
             }
 
-            // 🧾 حذف المستخدم من قاعدة البيانات
+            // 🧾 حذف من قاعدة البيانات
             await RoomSchemaModel.updateOne(
                 { roomId },
                 { $pull: { users: { userId } } }
@@ -1351,25 +1363,24 @@ export const handleLeaveRoom = (socket) => {
             // 🧠 حذف من الذاكرة المؤقتة
             if (availableRooms.has(roomId)) {
                 const memoryRoom = availableRooms.get(roomId);
-                memoryRoom.users = memoryRoom.users.filter(
-                    (u) => u.userId !== userId
-                );
+                memoryRoom.users = memoryRoom.users.filter((u) => u.userId !== userId);
                 if (memoryRoom.users.length === 0) {
                     availableRooms.delete(roomId);
                 }
             }
 
-            // الخروج فعليًا من الغرفة
+            // الخروج من الروم
             socket.leave(roomId);
 
-            // ✅ إعلام باقي الأعضاء أن المستخدم خرج
-            socket.to(roomId).emit("userLeftRoom", {
+            const io = getIo();
+            io.in(roomId).emit("userLeftRoom", {
                 userId,
                 username: user.username,
                 profilePic: user.profilePic,
             });
 
-            // ✅ جلب أحدث بيانات الروم
+
+            // ✅ تحديث بيانات الروم
             const updatedRoom = await RoomSchemaModel.findOne({ roomId })
                 .populate("ownerId", "username profilePic")
                 .populate("users.userId", "username profilePic")
@@ -1384,7 +1395,6 @@ export const handleLeaveRoom = (socket) => {
                     profilePic: u.userId.profilePic,
                 }));
 
-                const io = getIo();
                 const roomData = {
                     roomId: updatedRoom.roomId,
                     roomName: updatedRoom.roomName,
@@ -1419,6 +1429,7 @@ export const handleLeaveRoom = (socket) => {
         }
     });
 };
+
 
 export const updateRoomLesson = (socket) => {
     socket.on("updateRoomLesson", async ({ roomId, newLessonId }) => {

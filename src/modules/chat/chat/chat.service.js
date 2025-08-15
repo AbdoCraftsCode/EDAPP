@@ -17,11 +17,11 @@ export const findGroupChat = asyncHandelr(async (req, res, next) => {
     const chat = await ChatModel.findOne().populate([
         {
             path: "participants",
-            select: "_id username"
+            select: "_id username profilePic"
         },
         {
             path: "messages.senderId",
-            select: "_id username"
+            select: "_id username profilePic"
         }
     ]);
 
@@ -82,5 +82,11 @@ export const findonechat2 = asyncHandelr(async (req, res, next) => {
         return successresponse(res, { chat: null });
     }
 
-    successresponse(res, { chat });
+    // استخراج الرسائل بالشكل المطلوب
+    const simplifiedMessages = chat.messages.map(msg => ({
+        message: msg.message,
+        senderId: msg.senderId._id
+    }));
+
+    successresponse(res, simplifiedMessages);
 });
