@@ -190,6 +190,100 @@ export const sendMessage2 = (socket) => {
 
 
 
+// export const sendMessage = (socket) => {
+//     socket.on("sendMessage", async (messageData) => {
+//         try {
+//             const { data } = await authenticationSocket({ socket });
+
+//             if (!data.valid) {
+//                 return socket.emit("socketErrorResponse", data);
+//             }
+
+//             const user = data.user;
+//             const userId = user._id.toString();
+//             const {
+//                 message,
+//                 voiceUrl,
+//                 imageUrl,
+//                 fileUrl
+//             } = messageData;
+
+//             // ✅ طباعة ما تم استلامه
+//             console.log("📨 استلام رسالة من المستخدم:", {
+//                 userId,
+//                 username: user.username,
+//                 message,
+//                 voiceUrl,
+//                 imageUrl,
+//                 fileUrl
+//             });
+
+//             const nothingSent = [message, voiceUrl, imageUrl, fileUrl]
+//                 .every(val => !val || (typeof val === "string" && val.trim() === ""));
+
+//             if (nothingSent) {
+//                 return socket.emit("socketErrorResponse", {
+//                     message: "❌ لا يمكن إرسال رسالة فارغة.",
+//                     status: 400
+//                 });
+//             }
+
+//             let chat = await ChatModel.findOne();
+//             if (!chat) {
+//                 chat = await ChatModel.create({
+//                     participants: [user._id],
+//                     messages: []
+//                 });
+//             }
+
+//             if (!chat.participants.includes(user._id)) {
+//                 chat.participants.push(user._id);
+//             }
+
+//             const messageId = new mongoose.Types.ObjectId();
+//             const messageDoc = {
+//                 _id: messageId,
+//                 message: message || null,
+//                 voiceUrl: voiceUrl || null,
+//                 imageUrl: imageUrl || null,
+//                 fileUrl: fileUrl || null,
+//                 senderId: user._id
+//             };
+
+//             chat.messages.push(messageDoc);
+//             await chat.save();
+
+//             const messageToSend = {
+//                 _id: messageId,
+//                 message: messageDoc.message,
+//                 voiceUrl: messageDoc.voiceUrl,
+//                 imageUrl: messageDoc.imageUrl,
+//                 fileUrl: messageDoc.fileUrl,
+//                 senderId: {
+//                     _id: user._id,
+//                     username: user.username
+//                 }
+//             };
+
+//             for (const participantId of chat.participants) {
+//                 const idStr = participantId.toString();
+//                 if (idStr !== userId && scketConnections.has(idStr)) {
+//                     socket.to(scketConnections.get(idStr)).emit("receiveMessage", messageToSend);
+//                 }
+//             }
+
+//             socket.emit("successMessage", { message: messageToSend });
+
+//         } catch (error) {
+//             console.error("❌ خطأ أثناء إرسال الرسالة:", error);
+//             socket.emit("socketErrorResponse", {
+//                 message: "❌ فشل إرسال الرسالة",
+//                 status: 500
+//             });
+//         }
+//     });
+// };
+
 export const sendMessage = (socket) => {
     socket.on("sendMessage", async (messageData) => {
         try {
@@ -253,26 +347,36 @@ export const sendMessage = (socket) => {
             chat.messages.push(messageDoc);
             await chat.save();
 
+            // ✅ هنا نزود بيانات الـ sender (بما فيها الصورة لو موجودة)
             const messageToSend = {
                 _id: messageId,
                 message: messageDoc.message,
                 voiceUrl: messageDoc.voiceUrl,
                 imageUrl: messageDoc.imageUrl,
                 fileUrl: messageDoc.fileUrl,
-                senderId: {
+                sender: {
                     _id: user._id,
-                    username: user.username
+                    username: user.username,
+                    profilePic: user.profilePic // 🎯 مهم
                 }
+            };
+
+            // ✅ الفورمات الجديد المطلوب
+            const wrappedMessage = {
+                message: {
+                    messages: [messageToSend]
+                },
+                data: {}
             };
 
             for (const participantId of chat.participants) {
                 const idStr = participantId.toString();
                 if (idStr !== userId && scketConnections.has(idStr)) {
-                    socket.to(scketConnections.get(idStr)).emit("receiveMessage", messageToSend);
+                    socket.to(scketConnections.get(idStr)).emit("receiveMessage", wrappedMessage);
                 }
             }
 
-            socket.emit("successMessage", { message: messageToSend });
+            socket.emit("successMessage", wrappedMessage);
 
         } catch (error) {
             console.error("❌ خطأ أثناء إرسال الرسالة:", error);
@@ -284,7 +388,6 @@ export const sendMessage = (socket) => {
     });
 };
 
-  
 
 // const waitingUsers = [];
 
