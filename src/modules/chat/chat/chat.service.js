@@ -29,10 +29,14 @@ export const findGroupChat = asyncHandelr(async (req, res, next) => {
         return successresponse(res, { messages: [] });
     }
 
-    // فلترة الرسائل بحيث ترجع فقط المحتوى + senderId + _id
+    // فلترة الرسائل بحيث ترجع: id + محتوى الرسالة + بيانات المرسل
     const simplifiedMessages = chat.messages.map(msg => ({
         _id: msg._id,
-        senderId: msg.senderId?._id,
+        sender: {
+            _id: msg.senderId?._id,
+            username: msg.senderId?.username,
+            profilePic: msg.senderId?.profilePic
+        },
         message: msg.message || null,
         voiceUrl: msg.voiceUrl || null,
         imageUrl: msg.imageUrl || null,
