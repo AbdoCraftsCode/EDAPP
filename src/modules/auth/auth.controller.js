@@ -147,7 +147,7 @@ routr.get("/getMyRank", authentication(), getMyRank)
 routr.get("/getTopStudentsOverall", getTopStudentsOverall)
 
 routr.get("/getUserFiles", authentication(), getUserFiles)
-routr.get("/getAllUsers",  getAllUsers)
+routr.get("/getAllUsers",authentication() , getAllUsers)
 routr.get("/getUserStorageUsage", authentication(), getUserStorageUsage)
 routr.get("/findGroupChat",  findGroupChat)
 routr.get("/GetFriendsList", authentication(),GetFriendsList)

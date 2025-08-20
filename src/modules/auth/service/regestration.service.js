@@ -718,21 +718,24 @@ export const signup = asyncHandelr(async (req, res, next) => {
 });
 
 
-export const getAllUsers = async (req, res, next) => {
-    try {
-        const users = await Usermodel.find({}, "username profilePic");
-        // 👆 كده بنجيب بس الحقول المطلوبة
+export const getAllUsers = asyncHandelr(async (req, res) => {
+    const currentUser = await Usermodel.findById(req.user._id).select("friends");
 
-        res.status(200).json({
-            success: true,
-            count: users.length,
-            data: users
-        });
-    } catch (error) {
-        next(error);
-    }
-};
+    const users = await Usermodel.find({}, "username profilePic");
 
+    const data = users.map((u) => ({
+        _id: u._id,
+        username: u.username,
+        profilePic: u.profilePic,
+        isFriend: currentUser.friends.includes(u._id), // 👈 التحقق هنا
+    }));
+
+    res.status(200).json({
+        success: true,
+        count: data.length,
+        data,
+    });
+});
 export const updateProfile = asyncHandelr(async (req, res, next) => {
     const { watchingplan, Downloadsplan, isPromoter } = req.body;
 
