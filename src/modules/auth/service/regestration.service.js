@@ -717,6 +717,22 @@ export const signup = asyncHandelr(async (req, res, next) => {
     return successresponse(res, "User created successfully", 201, );
 });
 
+
+export const getAllUsers = async (req, res, next) => {
+    try {
+        const users = await Usermodel.find({}, "username profilePic");
+        // 👆 كده بنجيب بس الحقول المطلوبة
+
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const updateProfile = asyncHandelr(async (req, res, next) => {
     const { watchingplan, Downloadsplan, isPromoter } = req.body;
 

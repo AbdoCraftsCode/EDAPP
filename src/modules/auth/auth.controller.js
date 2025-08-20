@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
-import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends } from "./service/regestration.service.js";
+import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends, getAllUsers } from "./service/regestration.service.js";
 import { bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createSubject, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
@@ -147,6 +147,7 @@ routr.get("/getMyRank", authentication(), getMyRank)
 routr.get("/getTopStudentsOverall", getTopStudentsOverall)
 
 routr.get("/getUserFiles", authentication(), getUserFiles)
+routr.get("/getAllUsers",  getAllUsers)
 routr.get("/getUserStorageUsage", authentication(), getUserStorageUsage)
 routr.get("/findGroupChat",  findGroupChat)
 routr.get("/GetFriendsList", authentication(),GetFriendsList)
