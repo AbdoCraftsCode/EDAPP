@@ -911,10 +911,70 @@ export const getTopStudentsOverall = async (req, res) => {
 // };
 
 
+// export const getMyExamStats = async (req, res) => {
+//     try {
+//         const studentId = req.user._id;
+
+//         const result = await examresultModel.aggregate([
+//             { $match: { studentId: studentId } },
+//             {
+//                 $group: {
+//                     _id: "$studentId",
+//                     totalScore: { $sum: "$totalScore" },
+//                     maxScore: { $sum: "$maxScore" },
+//                     examsCount: { $sum: 1 }
+//                 }
+//             },
+//             {
+//                 $addFields: {
+//                     percentage: {
+//                         $cond: [
+//                             { $eq: ["$maxScore", 0] },
+//                             0,
+//                             { $multiply: [{ $divide: ["$totalScore", "$maxScore"] }, 100] }
+//                         ]
+//                     }
+//                 }
+//             }
+//         ]);
+
+//         const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender _id");
+
+//         if (!user) {
+//             return res.status(404).json({ message: "❌ لم يتم العثور على الطالب" });
+//         }
+
+//         const stats = {
+//             studentName: user.username || "مجهول",
+//             studentEmail: user.email || "",
+//             profilePic: user.profilePic || "",
+//             classId: user.classId || "",
+//             _id: user._id || "",
+//             userId: user.userId || "",
+//             gender: user.gender || "",
+//             totalScore: result[0]?.totalScore || 0,
+//             maxScore: result[0]?.maxScore || 0,
+//             percentage: `${Math.round(result[0]?.percentage || 0)}%`,
+//             examsCount: result[0]?.examsCount || 0
+//         };
+
+//         res.status(200).json({
+//             message: "✅ تم جلب بيانات الطالب",
+//             studentStats: stats
+//         });
+
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).json({ message: "❌ خطأ أثناء جلب البيانات", error: err.message });
+//     }
+// };
+
+
 export const getMyExamStats = async (req, res) => {
     try {
         const studentId = req.user._id;
 
+        // ✅ حساب نتائج الامتحانات
         const result = await examresultModel.aggregate([
             { $match: { studentId: studentId } },
             {
@@ -938,12 +998,15 @@ export const getMyExamStats = async (req, res) => {
             }
         ]);
 
-        const user = await Usermodel.findById(studentId).select("username email classId profilePic userId gender _id");
+        // ✅ جلب بيانات المستخدم (مع البريميوم)
+        const user = await Usermodel.findById(studentId)
+            .select("username email classId profilePic userId gender isPremium premiumUntil");
 
         if (!user) {
             return res.status(404).json({ message: "❌ لم يتم العثور على الطالب" });
         }
 
+        // ✅ تنسيق بيانات الامتحان
         const stats = {
             studentName: user.username || "مجهول",
             studentEmail: user.email || "",
@@ -958,9 +1021,18 @@ export const getMyExamStats = async (req, res) => {
             examsCount: result[0]?.examsCount || 0
         };
 
+        // ✅ تنسيق بيانات البريميوم
+        const premium = {
+            userId: user._id,
+            isPremium: user.isPremium || false,
+            premiumUntil: user.premiumUntil || null
+        };
+
+        // ✅ رجع الاتنين مع بعض
         res.status(200).json({
             message: "✅ تم جلب بيانات الطالب",
-            studentStats: stats
+            studentStats: stats,
+            premiumStatus: premium
         });
 
     } catch (err) {
@@ -968,6 +1040,8 @@ export const getMyExamStats = async (req, res) => {
         res.status(500).json({ message: "❌ خطأ أثناء جلب البيانات", error: err.message });
     }
 };
+
+
 export const uploadChatAttachment = asyncHandelr(async (req, res) => {
     const file = req.file;
     const userId = req.user._id;
