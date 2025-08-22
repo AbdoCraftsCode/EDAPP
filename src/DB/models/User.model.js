@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema(
         deletedAt: { type: Date },
         bannedAt: { type: Date },
         isBanned: { type: Boolean, default: false },
-        isBrimume: { type: Boolean, default: false },
+        // isBrimume: { type: Boolean, default: false },
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         changecredintialTime: { type: Date },
         isBusy: { type: Boolean, default: false },
@@ -56,6 +56,8 @@ const userSchema = new mongoose.Schema(
         },
 
 
+        isPremium: { type: Boolean, default: false },
+        premiumUntil: { type: Date, default: null },
      
         profilePic: {
             secure_url: { type: String, }, // الصورة مطلوبة

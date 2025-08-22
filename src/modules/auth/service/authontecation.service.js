@@ -21,6 +21,7 @@ import { SubjectModel } from "../../../DB/models/class.model.js";
 import { CartoonImageModel } from "../../../DB/models/cartoonImageSchema.model.js";
 import { GeneralQuestionModel } from "../../../DB/models/questionSchema.model.js";
 import mongoose from "mongoose";
+import withdrawalSchemaModel from "../../../DB/models/withdrawalSchema.model.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -1342,5 +1343,120 @@ export const submitMatchingExam = async (req, res) => {
             message: "❌ حدث خطأ أثناء حفظ نتيجة الامتحان المشترك",
             error: err.message
         });
+    }
+};
+
+
+
+export const setUserPremium = asyncHandelr(async (req, res, next) => {
+    const { _id } = req.params;
+    const { days } = req.body; // 👈 عدد الأيام
+
+    // ✅ تأكد أن اللي بيعمل الطلب هو Owner (Admin)
+    if (req.user.role !== "Admin") {
+        return res.status(403).json({ message: "⛔ مسموح فقط للـ Admin" });
+    }
+
+    // ✅ تأكد إن _id صحيح
+    if (!_id.match(/^[0-9a-fA-F]{24}$/)) {
+        return res.status(400).json({ message: "❌ Invalid user ID format" });
+    }
+
+    // ✅ جلب المستخدم
+    const user = await Usermodel.findById(_id);
+    if (!user) {
+        return res.status(404).json({ message: "❌ User not found" });
+    }
+
+    // ✅ حساب تاريخ انتهاء البريميوم
+    const premiumUntil = new Date();
+    premiumUntil.setDate(premiumUntil.getDate() + Number(days));
+
+    user.isPremium = true;
+    user.premiumUntil = premiumUntil;
+
+    await user.save();
+
+    return res.status(200).json({
+        message: "✅ Premium status updated successfully",
+        data: {
+            userId: user._id,
+            isPremium: user.isPremium,
+            premiumUntil: user.premiumUntil,
+        },
+    });
+});
+
+
+
+export const getAllPremiumUsers = asyncHandelr(async (req, res, next) => {
+    // ✅ تأكد أن اللي بيطلب لازم يكون Admin
+    if (req.user.role !== "Admin") {
+        return res.status(403).json({ message: "⛔ مسموح فقط للـ Admin" });
+    }
+
+    // ✅ هات المستخدمين اللي عندهم isPremium = true
+    const users = await Usermodel.find({ isPremium: true })
+        .select("username isPremium premiumUntil");
+
+    if (!users.length) {
+        return res.status(200).json({ message: "⚠️ لا يوجد مستخدمين مشتركين حالياً" });
+    }
+
+    // ✅ تنسيق التاريخ بالعربي
+    const formattedUsers = users.map(u => ({
+        userId: u._id,
+        username: u.username,
+        حالة_الاشتراك: u.isPremium ? "بريميوم ✅" : "عادي ❌",
+        تاريخ_انتهاء_الاشتراك: u.premiumUntil
+            ? new Date(u.premiumUntil).toLocaleString("ar-EG", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit"
+            })
+            : "غير محدد"
+    }));
+
+    return res.status(200).json({
+        message: "✅ قائمة المشتركين البريميوم",
+        count: formattedUsers.length,
+        data: formattedUsers,
+    });
+});
+
+
+export const createWithdrawal = async (req, res) => {
+    try {
+        const { amount, serviceType ,phone} = req.body;
+
+        if (!amount || !serviceType) {
+            return res.status(400).json({ message: "❌ amount & serviceType required" });
+        }
+
+        if (req.user.balance < amount) {
+            return res.status(400).json({ message: "❌ Insufficient balance" });
+        }
+
+        // خصم الرصيد
+        req.user.balance -= amount;
+        await req.user.save();
+
+        // حفظ الطلب
+        const withdrawal = await withdrawalSchemaModel.create({
+            userId: req.user._id,
+            amount,
+            phone,
+            serviceType,
+        });
+
+        res.json({
+            message: "✅ Withdrawal request created successfully",
+            data: withdrawal,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "❌ Server error", error: error.message });
     }
 };
