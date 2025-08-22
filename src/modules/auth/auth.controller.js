@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends, getAllUsers } from "./service/regestration.service.js";
-import { bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createSubject, createWithdrawal, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createSubject, createWithdrawal, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat, findonechat2 } from "../chat/chat/chat.service.js";
@@ -132,7 +132,7 @@ routr.post("/createExam", authentication(), createExam)
 
 routr.post("/submitExam", authentication(), submitExam)
 routr.post("/createWithdrawal", authentication(), createWithdrawal)
-
+routr.get("/getMyPremiumStatus", authentication(), getMyPremiumStatus)
 routr.get("/getResultByLesson/:lessonId", authentication(), getResultByLesson)
 routr.get("/getMyExamResults", authentication(), getMyExamResults)
 routr.get("/getMyExamStats", authentication(), getMyExamStats)

@@ -1426,6 +1426,34 @@ export const getAllPremiumUsers = asyncHandelr(async (req, res, next) => {
         data: formattedUsers,
     });
 });
+export const getMyPremiumStatus = asyncHandelr(async (req, res, next) => {
+    // ✅ جلب بيانات المستخدم من التوكن
+    const user = await Usermodel.findById(req.user._id)
+        .select("username isPremium premiumUntil");
+
+    if (!user) {
+        return res.status(404).json({ message: "❌ المستخدم غير موجود" });
+    }
+
+    return res.status(200).json({
+        message: "✅ حالة الاشتراك الخاصة بك",
+        data: {
+            userId: user._id,
+            username: user.username,
+            حالة_الاشتراك: user.isPremium ? "بريميوم ✅" : "عادي ❌",
+            تاريخ_انتهاء_الاشتراك: user.premiumUntil
+                ? new Date(user.premiumUntil).toLocaleString("ar-EG", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                })
+                : "غير محدد"
+        }
+    });
+});
 
 
 export const createWithdrawal = async (req, res) => {
