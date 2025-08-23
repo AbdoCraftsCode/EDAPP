@@ -22,6 +22,7 @@ import { CartoonImageModel } from "../../../DB/models/cartoonImageSchema.model.j
 import { GeneralQuestionModel } from "../../../DB/models/questionSchema.model.js";
 import mongoose from "mongoose";
 import withdrawalSchemaModel from "../../../DB/models/withdrawalSchema.model.js";
+import { BankQuestionModel } from "../../../DB/models/BankQuestionModel.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -1325,6 +1326,68 @@ export const bulkCreateGeneralQuestions = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "❌ خطأ أثناء إضافة الأسئلة", error: err.message });
+    }
+};
+
+
+export const bankCreateGeneralQuestions = async (req, res) => {
+    try {
+        const questions = req.body;
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({ message: "❌ يجب إرسال مصفوفة من الأسئلة" });
+        }
+
+        const created = await BankQuestionModel.insertMany(questions);
+
+        res.status(201).json({
+            message: "✅ تم إضافة الأسئلة بنجاح",
+            insertedCount: created.length,
+            insertedQuestions: created,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء إضافة الأسئلة", error: err.message });
+    }
+};
+
+export const getBankQuestionsByClass = async (req, res) => {
+    try {
+        const { classId } = req.user;
+        if (!classId) {
+            return res.status(400).json({ message: "❌ لم يتم العثور على الصف الدراسي في التوكن" });
+        }
+
+        // 🟢 Pagination params
+        let { page = 1, limit = 10 } = req.query;
+        page = parseInt(page);
+        limit = parseInt(limit);
+
+        const skip = (page - 1) * limit;
+
+        // 🟢 Get total questions count
+        const total = await BankQuestionModel.countDocuments({ classId });
+
+        // 🟢 Get questions with pagination
+        const questions = await BankQuestionModel.find({ classId })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        res.status(200).json({
+            message: "✅ تم جلب الأسئلة الخاصة بالصف الدراسي",
+            classId,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+            questions
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء جلب الأسئلة", error: err.message });
     }
 };
 

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends, getAllUsers } from "./service/regestration.service.js";
-import { bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createSubject, createWithdrawal, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createSubject, createWithdrawal, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat, findonechat2 } from "../chat/chat/chat.service.js";
@@ -102,7 +102,7 @@ routr.post(
 
 routr.post("/resendOTP", resendOTP)
 routr.post("/createClass", createClass)
-
+routr.post("/bankCreateGeneralQuestions", bankCreateGeneralQuestions)
 routr.get("/getAllMaterials", getAllMaterials)
 
 routr.post("/createChapter", authentication(), createChapter)
@@ -111,6 +111,9 @@ routr.post("/createLesson",authentication() ,createLesson)
 routr.patch("/updateProfile", authentication(), updateProfile)
 routr.delete("/deleteFile/:fileId", authentication(), deleteFile)
 routr.patch("/updateFileName/:fileId", authentication(), updateFileName)
+
+routr.get("/getBankQuestionsByClass", authentication(), getBankQuestionsByClass)
+
 routr.get("/getUserEarnings", authentication(), getUserEarnings)
 
 
