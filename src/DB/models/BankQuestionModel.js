@@ -6,6 +6,7 @@ const bankQuestionSchema = new mongoose.Schema({
     options: [{ type: String, required: true }],
     correctAnswer: { type: String, required: true },
     classId: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
+    roomId: { type: mongoose.Schema.Types.ObjectId, ref: "Room", required: true },
        timeLimit: { type: Number, default: 30 },
 }, { timestamps: true });
 

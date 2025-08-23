@@ -23,6 +23,9 @@ import { GeneralQuestionModel } from "../../../DB/models/questionSchema.model.js
 import mongoose from "mongoose";
 import withdrawalSchemaModel from "../../../DB/models/withdrawalSchema.model.js";
 import { BankQuestionModel } from "../../../DB/models/BankQuestionModel.js";
+import { RoomModell } from "../../../DB/models/roomSchemaaa.js";
+import { WeeklyScoreModel } from "../../../DB/models/weeklyScoreSchema.js";
+import { AnsweredModel } from "../../../DB/models/answeredSchema.js";
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -1625,3 +1628,129 @@ export const createWithdrawal = async (req, res) => {
         res.status(500).json({ message: "❌ Server error", error: error.message });
     }
 };
+
+
+
+export const createRoom = async (req, res) => {
+    try {
+        const { name, resetDay } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ message: "❌ يجب إدخال اسم الروم" });
+        }
+
+        const room = new RoomModell({
+            name,
+            resetDay: resetDay ?? 6, // الافتراضي السبت
+        });
+
+        await room.save();
+
+        res.status(201).json({
+            message: "✅ تم إنشاء الروم بنجاح",
+            room,
+        });
+    } catch (err) {
+        console.error("❌ خطأ في إنشاء الروم:", err);
+        res.status(500).json({ message: "❌ خطأ في إنشاء الروم", error: err.message });
+    }
+};
+
+
+
+// utils/week.js
+// احسب weekKey بناءً على resetDay للـ Room والمنطقة الزمنية Africa/Cairo
+export function getWeekKey(resetDay = 6, now = new Date()) {
+    // هنحوّل توقيت السيرفر لتوقيت القاهرة (تقريبي بدون مكتبات خارجية)
+    // لو عايز دقة أعلى استخدم luxon أو moment-timezone.
+    const cairoOffsetMs = 2 * 60 * 60 * 1000; // UTC+2 (بدون DST تعقيد)
+    const cairo = new Date(now.getTime() + cairoOffsetMs);
+
+    // اليوم: 0=Sunday..6=Saturday
+    const day = cairo.getUTCDay();
+    const diffToReset = (7 + (day - resetDay)) % 7;
+
+    // بداية الأسبوع الحالي (الـ reset) بتوقيت "تقريبي" القاهرة
+    const startOfWeek = new Date(cairo);
+    startOfWeek.setUTCDate(cairo.getUTCDate() - diffToReset);
+    startOfWeek.setUTCHours(0, 0, 0, 0);
+
+    // سنة وأسبوع من السنة (بسيطة/تقريبية)
+    const year = startOfWeek.getUTCFullYear();
+    const startOfYear = new Date(Date.UTC(year, 0, 1));
+    const daysFromYearStart = Math.floor((startOfWeek - startOfYear) / (24 * 60 * 60 * 1000));
+    const weekNumber = Math.floor(daysFromYearStart / 7) + 1;
+
+    return `${year}-W${String(weekNumber).padStart(2, "0")}`;
+}
+
+
+export const answerQuestion = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { classId } = req.user;
+        const { roomId } = req.params;
+        const { questionId, answer } = req.body;
+
+        if (!roomId) return res.status(400).json({ message: "❌ roomId مطلوب" });
+        if (!questionId) return res.status(400).json({ message: "❌ questionId مطلوب" });
+        if (typeof answer === "undefined") return res.status(400).json({ message: "❌ answer مطلوب" });
+
+        const room = await RoomModell.findById(roomId);
+        if (!room) return res.status(404).json({ message: "❌ الروم غير موجود" });
+
+        const question = await BankQuestionModel.findOne({ _id: questionId, roomId, classId });
+        if (!question) return res.status(404).json({ message: "❌ السؤال غير موجود في هذا الروم/الصف" });
+
+        // منع تكرار الإجابة مدى الحياة
+        const already = await AnsweredModel.findOne({ userId, questionId });
+        if (already) {
+            return res.status(400).json({ message: "❌ لقد أجبت على هذا السؤال من قبل" });
+        }
+
+        const correct = (answer === question.correctAnswer);
+
+        // weekKey الحالي للروم
+        const weekKey = getWeekKey(room.resetDay);
+
+        // جيب/أنشئ رصيد الأسبوع
+        let weekly = await WeeklyScoreModel.findOne({ userId, roomId, weekKey });
+        if (!weekly) {
+            weekly = await WeeklyScoreModel.create({
+                userId, roomId, weekKey, points: 0, answeredQuestions: []
+            });
+        }
+
+        // تأكد مايحاولش يكرر نفس السؤال خلال نفس الأسبوع (احتياط)
+        if (weekly.answeredQuestions.some(id => id.toString() === questionId)) {
+            return res.status(400).json({ message: "❌ تم احتساب هذا السؤال ضمن نقاط هذا الأسبوع بالفعل" });
+        }
+
+        // حدّث النقاط
+        if (correct) {
+            weekly.points += question.mark;
+        }
+        weekly.answeredQuestions.push(question._id);
+        await weekly.save();
+
+        // سجّل الإجابة (History lifetime)
+        await AnsweredModel.create({
+            userId,
+            roomId,
+            questionId,
+            correct
+        });
+
+        res.status(200).json({
+            message: "✅ تم تسجيل الإجابة",
+            correct,
+            gained: correct ? question.mark : 0,
+            weekKey,
+            weeklyPoints: weekly.points
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء تسجيل الإجابة", error: err.message });
+    }
+};
+
