@@ -789,63 +789,193 @@ export const handleMatching = (socket) => {
 //         });
 //     });
 // };
+ // userId -> socketId
+ // 🟢 غير المسار حسب مكانك
+
+// const socketConnections = new Map(); // userId -> socketId
+// const rooms = new Map(); // roomId -> [userIds]
+// // 🟢 خلي بالك تستورد الـ getIo
+
+// export const handleVoiceCall = (socket) => {
+//     socket.on("join-room", async ({ roomId }) => {
+//         try {
+//             const userId = socket.user._id.toString(); // userId من JWT
+//             const io = getIo();
+
+//             socket.join(roomId);
+//             socketConnections.set(userId, socket.id);
+
+//             if (!rooms.has(roomId)) {
+//                 rooms.set(roomId, []);
+//             }
+//             rooms.get(roomId).push(userId);
+
+//             console.log(`✅ ${userId} انضم للغرفة ${roomId}`);
+
+//             // أبلغ الموجودين
+//             socket.to(roomId).emit("user-joined", { userId });
+
+//         } catch (err) {
+//             console.error("❌ خطأ في join-room:", err);
+//             socket.emit("socketErrorResponse", {
+//                 message: "❌ خطأ أثناء محاولة الانضمام للغرفة",
+//                 error: err.message,
+//                 status: 500,
+//             });
+//         }
+//     });
+
+//     socket.on("offer", async ({ to, offer }) => {
+//         const io = getIo();
+//         const toSocketId = socketConnections.get(to);
+//         if (toSocketId) {
+//             io.to(toSocketId).emit("offer", {
+//                 from: socket.user._id.toString(),
+//                 offer,
+//             });
+//         }
+//     });
+
+//     socket.on("answer", async ({ to, answer }) => {
+//         const io = getIo();
+//         const toSocketId = socketConnections.get(to);
+//         if (toSocketId) {
+//             io.to(toSocketId).emit("answer", {
+//                 from: socket.user._id.toString(),
+//                 answer,
+//             });
+//         }
+//     });
+//     socket.on("ice-candidate", async ({ to, candidate }) => {
+//         try {
+//             const io = getIo();
+//             const toSocketId = socketConnections.get(to);
+//             if (toSocketId) {
+//                 io.to(toSocketId).emit("ice-candidate", {
+//                     from: socket.user._id.toString(),
+//                     candidate,
+//                 });
+//             }
+//         } catch (err) {
+//             console.error("❌ خطأ في ice-candidate:", err);
+//         }
+//     });
+
+
+//     socket.on("leave-room", async ({ roomId }) => {
+//         try {
+//             const userId = socket.user._id.toString();
+//             socket.leave(roomId);
+
+//             rooms.set(roomId, rooms.get(roomId).filter((id) => id !== userId));
+//             socket.to(roomId).emit("user-left", { userId });
+
+//             console.log(`👋 ${userId} غادر الغرفة ${roomId}`);
+//         } catch (err) {
+//             console.error("❌ خطأ في leave-room:", err);
+//         }
+//     });
+// };
+const rooms = new Map(); // roomId -> { offer, users, candidates }
+
+// 🟢 خلي بالك لازم تستورد getIo
 export const handleVoiceCall = (socket) => {
-    // الانضمام لروم
-    socket.on("join-room", ({ roomId }) => {
-        socket.join(roomId);
+    console.log("🔌 User connected:", socket.id);
 
-        console.log("========== [JOIN ROOM] ==========");
-        console.log("📌 SocketID:", socket.id);
-        console.log("👤 UserID:", socket.user?._id);
-        console.log("🏠 RoomID:", roomId);
-        console.log("================================");
+    // إنشاء غرفة جديدة
+    socket.on("create-room", async ({ offer }) => {
+        try {
+            const roomId = generateRoomId();
+            const io = getIo();
+
+            rooms.set(roomId, {
+                offer,
+                users: [socket.id],
+                candidates: [],
+            });
+
+            socket.join(roomId);
+            socket.emit("room-created", { roomId });
+
+            console.log(`✅ Room ${roomId} created by ${socket.id}`);
+        } catch (err) {
+            console.error("❌ خطأ في create-room:", err);
+            socket.emit("socketErrorResponse", {
+                message: "❌ خطأ أثناء إنشاء الغرفة",
+                error: err.message,
+                status: 500,
+            });
+        }
     });
 
-    // إرسال offer لباقي أعضاء الروم
-    socket.on("call-user", ({ roomId, offer }) => {
-        console.log("========== [CALL USER] =========");
-        console.log("📌 SocketID:", socket.id);
-        console.log("👤 From UserID:", socket.user?._id);
-        console.log("🏠 RoomID:", roomId);
-        console.log("📞 Offer:", offer);
-        console.log("================================");
+    // الانضمام إلى غرفة موجودة
+    socket.on("join-room", async ({ roomId }) => {
+        try {
+            const room = rooms.get(roomId);
+            const io = getIo();
 
-        socket.to(roomId).emit("receive-call", {
-            fromUserId: socket.user._id,
-            offer,
-        });
+            if (!room) {
+                socket.emit("room-not-found", { roomId });
+                return;
+            }
+
+            room.users.push(socket.id);
+            socket.join(roomId);
+
+            // أرسل العرض (offer) للمنضم الجديد
+            socket.emit("offer", room.offer);
+
+            // بلغ الموجودين ان في حد دخل
+            io.to(roomId).emit("user-joined", { userId: socket.id });
+
+            console.log(`👥 ${socket.id} joined room ${roomId}`);
+        } catch (err) {
+            console.error("❌ خطأ في join-room:", err);
+        }
     });
 
-    // إرسال answer
-    socket.on("answer-call", ({ roomId, answer }) => {
-        console.log("========== [ANSWER CALL] =======");
-        console.log("📌 SocketID:", socket.id);
-        console.log("👤 From UserID:", socket.user?._id);
-        console.log("🏠 RoomID:", roomId);
-        console.log("✅ Answer:", answer);
-        console.log("================================");
-
-        socket.to(roomId).emit("call-answered", {
-            fromUserId: socket.user._id,
-            answer,
-        });
+    // استقبال وإرسال Answer
+    socket.on("answer", async ({ roomId, answer }) => {
+        try {
+            const io = getIo();
+            socket.to(roomId).emit("answer", { answer });
+        } catch (err) {
+            console.error("❌ خطأ في answer:", err);
+        }
     });
 
-    // تبادل ICE
-    socket.on("ice-candidate", ({ roomId, candidate }) => {
-        console.log("========== [ICE CANDIDATE] =====");
-        console.log("📌 SocketID:", socket.id);
-        console.log("👤 From UserID:", socket.user?._id);
-        console.log("🏠 RoomID:", roomId);
-        console.log("🧊 Candidate:", candidate);
-        console.log("================================");
+    // استقبال وإرسال ICE Candidate
+    socket.on("ice-candidate", async ({ roomId, candidate }) => {
+        try {
+            const io = getIo();
+            socket.to(roomId).emit("ice-candidate", { candidate });
+        } catch (err) {
+            console.error("❌ خطأ في ice-candidate:", err);
+        }
+    });
 
-        socket.to(roomId).emit("ice-candidate", {
-            fromUserId: socket.user._id,
-            candidate,
-        });
+    // عند خروج المستخدم
+    socket.on("disconnect", () => {
+        console.log("❌ User disconnected:", socket.id);
+
+        for (const [roomId, room] of rooms.entries()) {
+            const index = room.users.indexOf(socket.id);
+            if (index !== -1) {
+                room.users.splice(index, 1);
+
+                if (room.users.length === 0) {
+                    rooms.delete(roomId);
+                    console.log(`🗑️ Room ${roomId} deleted (empty)`);
+                }
+            }
+        }
     });
 };
+
+// 🆔 دالة لتوليد roomId
+function generateRoomId() {
+    return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
 
 
 
