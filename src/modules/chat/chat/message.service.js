@@ -758,37 +758,95 @@ export const handleMatching = (socket) => {
 
 
 
+// export const handleVoiceCall = (socket) => {
+//     socket.on("call-user", ({ toUserId, offer }) => {
+//         const toSocketId = scketConnections.get(toUserId);
+//         if (!toSocketId) return;
+//         console.log("📞 إرسال offer من", socket.user._id, "إلى", toUserId);
+//         socket.to(toSocketId).emit("receive-call", {
+//             fromUserId: socket.user._id,
+//             offer,
+//         });
+//     });
+
+//     socket.on("answer-call", ({ toUserId, answer }) => {
+//         const toSocketId = scketConnections.get(toUserId);
+//         if (!toSocketId) return;
+//         console.log("✅ الرد من", socket.user._id, "إلى", toUserId);
+//         socket.to(toSocketId).emit("call-answered", {
+//             fromUserId: socket.user._id,
+//             answer,
+//         });
+//     });
+
+//     socket.on("ice-candidate", ({ toUserId, candidate }) => {
+//         const toSocketId = scketConnections.get(toUserId);
+//         if (!toSocketId) return;
+//         console.log("🧊 ICE من", socket.user._id, "إلى", toUserId);
+//         socket.to(toSocketId).emit("ice-candidate", {
+//             fromUserId: socket.user._id,
+//             candidate,
+//         });
+//     });
+// };
 export const handleVoiceCall = (socket) => {
-    socket.on("call-user", ({ toUserId, offer }) => {
-        const toSocketId = scketConnections.get(toUserId);
-        if (!toSocketId) return;
-        console.log("📞 إرسال offer من", socket.user._id, "إلى", toUserId);
-        socket.to(toSocketId).emit("receive-call", {
+    // الانضمام لروم
+    socket.on("join-room", ({ roomId }) => {
+        socket.join(roomId);
+
+        console.log("========== [JOIN ROOM] ==========");
+        console.log("📌 SocketID:", socket.id);
+        console.log("👤 UserID:", socket.user?._id);
+        console.log("🏠 RoomID:", roomId);
+        console.log("================================");
+    });
+
+    // إرسال offer لباقي أعضاء الروم
+    socket.on("call-user", ({ roomId, offer }) => {
+        console.log("========== [CALL USER] =========");
+        console.log("📌 SocketID:", socket.id);
+        console.log("👤 From UserID:", socket.user?._id);
+        console.log("🏠 RoomID:", roomId);
+        console.log("📞 Offer:", offer);
+        console.log("================================");
+
+        socket.to(roomId).emit("receive-call", {
             fromUserId: socket.user._id,
             offer,
         });
     });
 
-    socket.on("answer-call", ({ toUserId, answer }) => {
-        const toSocketId = scketConnections.get(toUserId);
-        if (!toSocketId) return;
-        console.log("✅ الرد من", socket.user._id, "إلى", toUserId);
-        socket.to(toSocketId).emit("call-answered", {
+    // إرسال answer
+    socket.on("answer-call", ({ roomId, answer }) => {
+        console.log("========== [ANSWER CALL] =======");
+        console.log("📌 SocketID:", socket.id);
+        console.log("👤 From UserID:", socket.user?._id);
+        console.log("🏠 RoomID:", roomId);
+        console.log("✅ Answer:", answer);
+        console.log("================================");
+
+        socket.to(roomId).emit("call-answered", {
             fromUserId: socket.user._id,
             answer,
         });
     });
 
-    socket.on("ice-candidate", ({ toUserId, candidate }) => {
-        const toSocketId = scketConnections.get(toUserId);
-        if (!toSocketId) return;
-        console.log("🧊 ICE من", socket.user._id, "إلى", toUserId);
-        socket.to(toSocketId).emit("ice-candidate", {
+    // تبادل ICE
+    socket.on("ice-candidate", ({ roomId, candidate }) => {
+        console.log("========== [ICE CANDIDATE] =====");
+        console.log("📌 SocketID:", socket.id);
+        console.log("👤 From UserID:", socket.user?._id);
+        console.log("🏠 RoomID:", roomId);
+        console.log("🧊 Candidate:", candidate);
+        console.log("================================");
+
+        socket.to(roomId).emit("ice-candidate", {
             fromUserId: socket.user._id,
             candidate,
         });
     });
 };
+
 
 
 const availableRooms = new Map();

@@ -26,6 +26,10 @@ import { BankQuestionModel } from "../../../DB/models/BankQuestionModel.js";
 import { RoomModell } from "../../../DB/models/roomSchemaaa.js";
 import { WeeklyScoreModel } from "../../../DB/models/weeklyScoreSchema.js";
 import { AnsweredModel } from "../../../DB/models/answeredSchema.js";
+
+import moment from "moment";
+
+
 export const login = asyncHandelr(async (req, res, next) => {
     const { email, password } = req.body;
     console.log(email, password);
@@ -1754,3 +1758,91 @@ export const answerQuestion = async (req, res) => {
     }
 };
 
+
+
+export const getWeeklyRank = async (req, res) => {
+    try {
+        const userId = req.user._id;      // من التوكن
+        const classId = req.user.classId; // من التوكن
+        const { roomId } = req.params;
+
+        if (!roomId) {
+            return res.status(400).json({ message: "❌ roomId مطلوب" });
+        }
+
+        // جيب بيانات الروم
+        const room = await RoomModell.findById(roomId);
+        if (!room) return res.status(404).json({ message: "❌ الروم غير موجود" });
+
+        // weekKey الحالي
+        const weekKey = getWeekKey(room.resetDay);
+
+        // جيب نقاط الطالب هذا الأسبوع
+        const myScore = await WeeklyScoreModel.findOne({ userId, roomId, weekKey });
+
+        // لو معندوش نقاط
+        if (!myScore) {
+            return res.json({
+                success: true,
+                message: "✅ لا يوجد بيانات لهذا الأسبوع بعد",
+                data: {
+                    weekKey,
+                    points: 0,
+                    rank: null,
+                    expiresIn: getRemainingTime(room.resetDay),
+                    previousWeeks: []
+                }
+            });
+        }
+
+        // جيب كل الطلاب في الروم والأسبوع الحالي
+        const allScores = await WeeklyScoreModel.find({ roomId, weekKey })
+            .sort({ points: -1, updatedAt: 1 });
+
+        // احسب ترتيبي
+        const rank = allScores.findIndex(s => s.userId.toString() === userId.toString()) + 1;
+
+        // جيب الأسابيع السابقة لنفس الطالب
+        const previousWeeks = await WeeklyScoreModel.find({
+            userId,
+            roomId,
+            weekKey: { $lt: weekKey }
+        }).sort({ weekKey: -1 });
+
+        res.json({
+            success: true,
+            message: "✅ تم جلب ترتيب الطالب",
+            data: {
+                weekKey,
+                points: myScore.points,
+                rank,
+                expiresIn: getRemainingTime(room.resetDay),
+                previousWeeks: previousWeeks.map(w => ({
+                    weekKey: w.weekKey,
+                    points: w.points
+                }))
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "❌ خطأ أثناء جلب الترتيب", error: err.message });
+    }
+};
+
+// 🕒 احسب الوقت المتبقي لانتهاء الأسبوع الحالي
+function getRemainingTime(resetDay, now = new Date()) {
+    const cairoOffsetMs = 2 * 60 * 60 * 1000;
+    const cairo = new Date(now.getTime() + cairoOffsetMs);
+
+    const day = cairo.getUTCDay();
+    const diffToReset = (7 + (resetDay - day)) % 7;
+
+    const endOfWeek = new Date(cairo);
+    endOfWeek.setUTCDate(cairo.getUTCDate() + diffToReset);
+    endOfWeek.setUTCHours(23, 59, 59, 999);
+
+    const diffMs = endOfWeek - cairo;
+    const duration = moment.duration(diffMs);
+
+    return `${duration.days()}d ${duration.hours()}h ${duration.minutes()}m`;
+}
