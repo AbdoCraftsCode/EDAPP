@@ -44,6 +44,8 @@ const userSchema = new mongoose.Schema(
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         changecredintialTime: { type: Date },
         isBusy: { type: Boolean, default: false },
+
+        myWallet: { type: Number, default: 0 },
         isSearching: { type: Boolean, default: false },
         fcmToken: { type: String, default: null },
         image: {
