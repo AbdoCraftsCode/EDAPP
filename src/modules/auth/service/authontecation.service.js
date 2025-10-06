@@ -27,7 +27,8 @@ import { RoomModell } from "../../../DB/models/roomSchemaaa.js";
 import { WeeklyScoreModel } from "../../../DB/models/weeklyScoreSchema.js";
 import { AnsweredModel } from "../../../DB/models/answeredSchema.js";
 
-import moment from "moment";
+// import moment from "moment";
+import { DailyAnswerModel, DailyExamModel, DailyQuestionModel, DailyResultModel } from "../../../DB/models/dailyQuestionSchema.js";
 
 
 export const login = asyncHandelr(async (req, res, next) => {
@@ -1846,3 +1847,385 @@ function getRemainingTime(resetDay, now = new Date()) {
 
     return `${duration.days()}d ${duration.hours()}h ${duration.minutes()}m`;
 }
+
+
+
+
+// POST /api/daily-questions/bulk
+export const createDailyQuestion = async (req, res) => {
+    try {
+        const { questions } = req.body;
+
+        if (!questions || !Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "❌ يجب إرسال مصفوفة تحتوي على أسئلة",
+            });
+        }
+
+        // ✅ التحقق من صحة كل سؤال
+        for (const q of questions) {
+            if (!q.question || !q.options || q.options.length < 2 || !q.correctAnswer || !q.classId) {
+                return res.status(400).json({
+                    success: false,
+                    message: "❌ كل سؤال يجب أن يحتوي على (نص السؤال، على الأقل خيارين، الإجابة الصحيحة، الصف الدراسي)",
+                });
+            }
+        }
+
+        const newQuestions = await DailyQuestionModel.insertMany(questions);
+
+        res.status(201).json({
+            success: true,
+            message: `✅ تم إضافة ${newQuestions.length} سؤال`,
+            data: newQuestions,
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء إضافة الأسئلة",
+            error: err.message,
+        });
+    }
+};
+
+
+// POST /api/daily-exams
+
+export const createDailyExam = async (req, res) => {
+    try {
+        let examDate;
+        if (req.body.date) {
+            // 🕛 خزّن التاريخ كبداية اليوم بتوقيت القاهرة
+            examDate = moment.tz(req.body.date, "YYYY-MM-DD", "Africa/Cairo").startOf("day").toDate();
+        } else {
+            examDate = moment.tz("Africa/Cairo").startOf("day").toDate();
+        }
+
+
+        const exam = await DailyExamModel.create({
+            ...req.body,
+            date: examDate,
+            isActive: false
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "✅ تم إنشاء الامتحان",
+            exam
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء إنشاء الامتحان",
+            error: err.message
+        });
+    }
+};
+
+
+
+
+// GET /api/daily-exams/active
+// export const getActiveDailyExam = async (req, res) => {
+//     try {
+//         const user = req.user; // ✅ الطالب جاي من التوكن
+//         if (!user || !user.classId) {
+//             return res.status(401).json({
+//                 success: false,
+//                 message: "❌ لم يتم العثور على بيانات الطالب"
+//             });
+//         }
+
+//         // ✅ اجلب الامتحان النشط فقط
+//         const exam = await DailyExamModel.findOne({ isActive: true })
+//             .populate({
+//                 path: "questions",
+//                 model: "DailyQuestion",
+//                 select: "question options mark classId correctAnswer"
+//             })
+//             .populate("classId", "name");
+
+//         if (!exam) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "❌ لا يوجد امتحان نشط حاليًا"
+//             });
+//         }
+
+//         // ✅ تحقق من أن الصف الدراسي للطالب مطابق للامتحان
+//         if (exam.classId._id.toString() !== user.classId.toString()) {
+//             return res.status(403).json({
+//                 success: false,
+//                 message: "❌ الامتحان غير مخصص لصفك الدراسي"
+//             });
+//         }
+
+//         res.status(200).json({
+//             success: true,
+//             message: "✅ تم جلب الامتحان النشط",
+//             exam
+//         });
+//     } catch (err) {
+//         res.status(500).json({
+//             success: false,
+//             message: "❌ خطأ أثناء جلب الامتحان",
+//             error: err.message
+//         });
+//     }
+// };
+
+
+// POST /api/daily-answers
+export const answerDailyQuestion = async (req, res) => {
+    try {
+        const { examId, questionId, selectedAnswer } = req.body;
+        const studentId = req.user._id;   // ✅ الطالب من التوكن
+
+        // ✅ تحقق: هل الطالب جاوب السؤال ده قبل كده؟
+        const alreadyAnswered = await DailyAnswerModel.findOne({ examId, questionId, studentId });
+        if (alreadyAnswered) {
+            return res.status(400).json({ success: false, message: "❌ لقد أجبت هذا السؤال من قبل" });
+        }
+
+        // ✅ هات السؤال
+        const question = await DailyQuestionModel.findById(questionId);
+        if (!question) {
+            return res.status(404).json({ success: false, message: "❌ السؤال غير موجود" });
+        }
+
+        // ✅ تحقق إن الامتحان يخص نفس صف الطالب
+        const exam = await DailyExamModel.findById(examId).populate("classId", "name");
+        if (!exam) {
+            return res.status(404).json({ success: false, message: "❌ الامتحان غير موجود" });
+        }
+
+        if (String(exam.classId._id) !== String(req.user.classId)) {
+            return res.status(403).json({ success: false, message: "❌ لا يمكنك الدخول لهذا الامتحان" });
+        }
+
+        // ✅ تحقق من الإجابة
+        const isCorrect = question.correctAnswer === selectedAnswer;
+        const mark = isCorrect ? question.mark : 0;
+
+        // ✅ احفظ النتيجة
+        const answer = await DailyAnswerModel.create({
+            examId,
+            questionId,
+            studentId,
+            isCorrect,
+            mark
+        });
+
+        // ✅ حدث نتيجة الطالب (مجموع النقاط في DailyResultModel)
+        let result = await DailyResultModel.findOne({ examId, studentId });
+        if (!result) {
+            result = await DailyResultModel.create({
+                examId,
+                studentId,
+                classId: question.classId,
+                score: mark,
+                timeTaken: 0 // هنحسبها بعدين
+            });
+        } else {
+            result.score += mark;
+            await result.save();
+        }
+
+        res.status(201).json({
+            success: true,
+            message: isCorrect ? "✅ إجابة صحيحة" : "❌ إجابة خاطئة",
+            earnedMark: mark,
+            totalScore: result.score
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: "❌ خطأ أثناء تسجيل الإجابة", error: err.message });
+    }
+};
+
+import cron from "node-cron";
+import moment from "moment-timezone";
+
+// 📌 كرون كل يوم 12 بالليل بتوقيت القاهرة
+cron.schedule("0 0 * * *", async () => {
+    try {
+        const startOfDay = moment.tz("Africa/Cairo").startOf("day").toDate();
+        const endOfDay = moment.tz("Africa/Cairo").endOf("day").toDate();
+
+        console.log("🕛 تشغيل Cron Job: تحديث الامتحانات لليوم (UTC)");
+
+        // اقفل كل الامتحانات القديمة
+        await DailyExamModel.updateMany({ isActive: true }, { isActive: false });
+
+        // فعل امتحان اليوم
+        const activatedExam = await DailyExamModel.findOneAndUpdate(
+            { date: { $gte: startOfDay, $lte: endOfDay } },
+            { isActive: true },
+            { new: true }
+        );
+
+        if (activatedExam) {
+            console.log("✅ تم تفعيل امتحان اليوم:", activatedExam.title);
+        } else {
+            console.log("⚠️ لا يوجد امتحان لهذا اليوم");
+        }
+    } catch (err) {
+        console.error("❌ خطأ في الـ Cron Job:", err.message);
+    }
+});
+
+
+
+// 📌 GET /api/daily-rank
+export const getDailyRank = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const startOfDay = moment.tz("Africa/Cairo").startOf("day").toDate();
+        const endOfDay = moment.tz("Africa/Cairo").endOf("day").toDate();
+
+
+        // ✅ هات الامتحان النشط لليوم
+        const exam = await DailyExamModel.findOne({
+            date: { $gte: startOfDay, $lte: endOfDay },
+            isActive: true
+        });
+
+        if (!exam) {
+            return res.status(404).json({
+                success: false,
+                message: "❌ لا يوجد امتحان اليوم"
+            });
+        }
+
+        // ✅ هات النتائج مرتبة تنازليًا
+        const topStudents = await DailyResultModel.find({ examId: exam._id })
+            .populate("studentId", "fullName email")
+            .sort({ score: -1, timeTaken: 1 })
+            .limit(10);
+
+        // ✅ هات ترتيب الطالب الحالي
+        const allResults = await DailyResultModel.find({ examId: exam._id })
+            .sort({ score: -1, timeTaken: 1 })
+            .lean();
+
+        const myIndex = allResults.findIndex(r => r.studentId.toString() === userId);
+
+        res.status(200).json({
+            success: true,
+            message: "✅ تم جلب الترتيب اليومي",
+            examId: exam._id,
+            top10: topStudents,
+            myRank: myIndex >= 0 ? myIndex + 1 : null
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء جلب الترتيب اليومي",
+            error: err.message
+        });
+    }
+};
+
+
+
+
+
+
+
+
+export const getActiveDailyExam = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user.classId) {
+            return res.status(401).json({
+                success: false,
+                message: "❌ لم يتم العثور على بيانات الطالب"
+            });
+        }
+
+        // ✅ الوقت الحالي بتوقيت القاهرة
+        const now = moment.tz("Africa/Cairo");
+        const startTime = now.clone().hour(21).minute(0).second(0);   // 9:00 PM
+        const endTime = now.clone().hour(23).minute(59).second(59);  // 11:59:59 PM
+
+        // ✅ هات الامتحان بتاع اليوم
+        const startOfDay = now.clone().startOf("day").toDate();
+        const endOfDay = now.clone().endOf("day").toDate();
+
+        const exam = await DailyExamModel.findOne({
+            date: { $gte: startOfDay, $lte: endOfDay }
+        })
+            .populate({
+                path: "questions",
+                model: "DailyQuestion",
+                select: "question options mark classId correctAnswer"
+            })
+            .populate("classId", "name");
+
+        if (!exam) {
+            return res.status(404).json({
+                success: false,
+                message: "❌ لا يوجد امتحان لهذا اليوم"
+            });
+        }
+
+        // ✅ تحقق من أن الصف الدراسي للطالب مطابق للامتحان
+        if (exam.classId._id.toString() !== user.classId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "❌ الامتحان غير مخصص لصفك الدراسي"
+            });
+        }
+
+        // 🕒 تحقق من وقت الفتح
+        if (now.isBefore(startTime)) {
+            const diffMs = startTime.diff(now);
+            const duration = moment.duration(diffMs);
+            return res.status(200).json({
+                success: true,
+                message: "⌛ الامتحان لسه ما فتحش",
+                title: exam.title,  // ✅ ضفت العنوان هنا
+                willOpenIn: {
+                    hours: duration.hours(),
+                    minutes: duration.minutes(),
+                    seconds: duration.seconds()
+                }
+            });
+        }
+
+        if (now.isAfter(endTime)) {
+            return res.status(403).json({
+                success: false,
+                message: "❌ انتهى وقت الامتحان اليوم",
+                title: exam.title // ✅ حتى لو انتهى تبعته
+            });
+        }
+
+        // ✅ لو الامتحان شغال دلوقتي
+        const diffMs = endTime.diff(now);
+        const duration = moment.duration(diffMs);
+        const remainingTime = {
+            hours: duration.hours(),
+            minutes: duration.minutes(),
+            seconds: duration.seconds()
+        };
+
+        res.status(200).json({
+            success: true,
+            message: "✅ تم جلب الامتحان النشط",
+            title: exam.title, // ✅ ضفت العنوان هنا
+            exam,
+            remainingTime
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء جلب الامتحان",
+            error: err.message
+        });
+    }
+};

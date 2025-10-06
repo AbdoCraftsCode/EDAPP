@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends, getAllUsers } from "./service/regestration.service.js";
-import { answerQuestion, bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createExam, createLesson, createRoom, createSubject, createWithdrawal, forgetpassword,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   getWeeklyRank,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { answerDailyQuestion, answerQuestion, bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createDailyExam, createDailyQuestion, createExam, createLesson, createRoom, createSubject, createWithdrawal, forgetpassword,   getActiveDailyExam,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getDailyRank,   getExamQuestions,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   getWeeklyRank,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat, findonechat2 } from "../chat/chat/chat.service.js";
@@ -103,14 +103,17 @@ routr.post(
 
 routr.post("/resendOTP", resendOTP)
 routr.post("/createRoom", createRoom)
-
+routr.post("/createDailyQuestion", createDailyQuestion)
+routr.post("/createDailyExam", createDailyExam)
 routr.post("/createClass", createClass)
 routr.post("/bankCreateGeneralQuestions", bankCreateGeneralQuestions)
 routr.get("/getAllMaterials", getAllMaterials)
 
 routr.post("/createChapter", authentication(), createChapter)
 routr.post("/createLesson", authentication(), createLesson)
-
+routr.post("/answerDailyQuestion", authentication(), answerDailyQuestion)
+routr.get("/getDailyRank", authentication(), getDailyRank)
+routr.get("/getActiveDailyExam", authentication(), getActiveDailyExam)
 routr.get("/getWeeklyRank/:roomId", authentication(), getWeeklyRank)
 
 routr.post("/answerQuestion/:roomId", authentication(), answerQuestion)
