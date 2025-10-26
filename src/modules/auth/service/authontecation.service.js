@@ -2445,19 +2445,26 @@ export const createPost = async (req, res) => {
 
 export const getAllPosts = async (req, res) => {
     try {
+        // 🧠 جلب كل البوستات مع بيانات الكاتب
         const posts = await PostModel.find()
             .populate("author", "username profilePic")
             .sort({ createdAt: -1 })
             .lean();
 
-        // 🧮 نحسب عدد التفاعلات لكل نوع وإجمالي التفاعلات
-        const formattedPosts = posts.map(post => {
+        // 🧮 تجهيز البوستات مع عدد التفاعلات والتعليقات
+        const formattedPosts = await Promise.all(posts.map(async (post) => {
             const likeCount = post.reactions.like?.length || 0;
             const loveCount = post.reactions.love?.length || 0;
             const laughCount = post.reactions.laugh?.length || 0;
             const supportCount = post.reactions.support?.length || 0;
 
             const totalReactions = likeCount + loveCount + laughCount + supportCount;
+
+            // 🗨️ جلب التعليقات الخاصة بكل بوست
+            const comments = await CommentModel.find({ postId: post._id })
+                .populate("userId", "username profilePic")
+                .sort({ createdAt: -1 })
+                .lean();
 
             return {
                 ...post,
@@ -2467,9 +2474,10 @@ export const getAllPosts = async (req, res) => {
                     laugh: laughCount,
                     support: supportCount,
                     total: totalReactions
-                }
+                },
+                comments
             };
-        });
+        }));
 
         res.status(200).json({
             success: true,
@@ -2485,6 +2493,7 @@ export const getAllPosts = async (req, res) => {
         });
     }
 };
+
 
 
 
