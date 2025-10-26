@@ -2063,85 +2063,119 @@ export const answerDailyQuestion = async (req, res) => {
 
 import cron from "node-cron";
 import moment from "moment-timezone";
+import { PostModel } from "../../../DB/models/postSchema.model.js";
+import { CommentModel } from "../../../DB/models/commentSchema.model.js";
 
 // 📌 كرون كل يوم 12 بالليل بتوقيت القاهرة
 cron.schedule("0 0 * * *", async () => {
-    try {
-        const startOfDay = moment.tz("Africa/Cairo").startOf("day").toDate();
-        const endOfDay = moment.tz("Africa/Cairo").endOf("day").toDate();
+    const now = moment.tz("Africa/Cairo");
+    const todayStart = now.clone().startOf("day").toDate();
+    const todayEnd = now.clone().endOf("day").toDate();
 
-        console.log("🕛 تشغيل Cron Job: تحديث الامتحانات لليوم (UTC)");
+    // اقفل امتحان أمس
+    await DailyExamModel.updateMany(
+        { date: { $lt: todayStart }, isActive: true },
+        { $set: { isActive: false } }
+    );
 
-        // اقفل كل الامتحانات القديمة
-        await DailyExamModel.updateMany({ isActive: true }, { isActive: false });
+    // افتح امتحان اليوم الجديد
+    await DailyExamModel.updateOne(
+        { date: { $gte: todayStart, $lte: todayEnd } },
+        { $set: { isActive: true } }
+    );
 
-        // فعل امتحان اليوم
-        const activatedExam = await DailyExamModel.findOneAndUpdate(
-            { date: { $gte: startOfDay, $lte: endOfDay } },
-            { isActive: true },
-            { new: true }
-        );
-
-        if (activatedExam) {
-            console.log("✅ تم تفعيل امتحان اليوم:", activatedExam.title);
-        } else {
-            console.log("⚠️ لا يوجد امتحان لهذا اليوم");
-        }
-    } catch (err) {
-        console.error("❌ خطأ في الـ Cron Job:", err.message);
-    }
+    console.log("✅ تم تحديث حالة الامتحانات تلقائيًا في منتصف الليل");
 });
 
 
 
-// 📌 GET /api/daily-rank
 export const getDailyRank = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const now = moment.tz("Africa/Cairo");
 
-        const startOfDay = moment.tz("Africa/Cairo").startOf("day").toDate();
-        const endOfDay = moment.tz("Africa/Cairo").endOf("day").toDate();
-
-
-        // ✅ هات الامتحان النشط لليوم
+        // 🔍 جلب آخر امتحان انتهى فعلاً
         const exam = await DailyExamModel.findOne({
-            date: { $gte: startOfDay, $lte: endOfDay },
-            isActive: true
-        });
+            date: { $lte: now.clone().startOf("day").toDate() },
+        })
+            .sort({ date: -1 })
+            .populate("classId", "name")
+            .lean();
 
         if (!exam) {
             return res.status(404).json({
                 success: false,
-                message: "❌ لا يوجد امتحان اليوم"
+                message: "❌ لا يوجد امتحانات منتهية بعد لعرض النتائج",
             });
         }
 
-        // ✅ هات النتائج مرتبة تنازليًا
+        // 🏆 جلب أعلى 10 طلاب
         const topStudents = await DailyResultModel.find({ examId: exam._id })
-            .populate("studentId", "fullName email")
+            .populate("studentId", "username profilePic email")
             .sort({ score: -1, timeTaken: 1 })
-            .limit(10);
-
-        // ✅ هات ترتيب الطالب الحالي
-        const allResults = await DailyResultModel.find({ examId: exam._id })
-            .sort({ score: -1, timeTaken: 1 })
+            .limit(10)
             .lean();
 
-        const myIndex = allResults.findIndex(r => r.studentId.toString() === userId);
+        if (topStudents.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "ℹ️ لا يوجد نتائج بعد لهذا الامتحان",
+                examTitle: exam.title,
+                examDate: exam.examDay,
+                leaderboard: [],
+            });
+        }
 
+        // ✅ توزيع الجوائز
+        if (exam.rewards && exam.rewards.length > 0) {
+            for (let i = 0; i < topStudents.length; i++) {
+                const student = topStudents[i];
+                const rewardObj = exam.rewards.find(r => r.rank === i + 1); // مثال: { rank: 1, amount: 2000 }
+
+                if (rewardObj && student) {
+                    // ✳️ تحديث النتيجة بالـ reward
+                    const resultDoc = await DailyResultModel.findById(student._id);
+                    if (resultDoc && !resultDoc.rewardGiven) {
+                        resultDoc.reward = rewardObj.amount;
+                        resultDoc.rewardGiven = true;
+                        await resultDoc.save();
+
+                        // 💰 تحديث رصيد الطالب
+                        await Usermodel.findByIdAndUpdate(student.studentId._id, {
+                            $inc: { myWallet: rewardObj.amount },
+                        });
+                    }
+                }
+            }
+        }
+
+        // 🧾 تجهيز البيانات النهائية للرد
+        const leaderboard = topStudents.map((result, index) => {
+            const rewardObj = exam.rewards.find(r => r.rank === index + 1);
+            return {
+                rank: index + 1,
+                username: result.studentId.username,
+                profilePic: result.studentId.profilePic?.secure_url || null,
+                score: result.score,
+                timeTaken: result.timeTaken,
+                reward: rewardObj ? rewardObj.amount : 0,
+            };
+        });
+
+        // ✅ إرسال الرد
         res.status(200).json({
             success: true,
-            message: "✅ تم جلب الترتيب اليومي",
-            examId: exam._id,
-            top10: topStudents,
-            myRank: myIndex >= 0 ? myIndex + 1 : null
+            message: "✅ تم جلب ترتيب الأوائل لآخر امتحان منتهي وتوزيع الجوائز بنجاح",
+            examTitle: exam.title,
+            examDate: exam.examDay,
+            leaderboard,
         });
 
     } catch (err) {
+        console.error("❌ Error:", err);
         res.status(500).json({
             success: false,
-            message: "❌ خطأ أثناء جلب الترتيب اليومي",
-            error: err.message
+            message: "❌ خطأ أثناء جلب الترتيب أو توزيع الجوائز",
+            error: err.message,
         });
     }
 };
@@ -2153,99 +2187,8 @@ export const getDailyRank = async (req, res) => {
 
 
 
-// export const getActiveDailyExam = async (req, res) => {
-//     try {
-//         const user = req.user;
-//         if (!user || !user.classId) {
-//             return res.status(401).json({
-//                 success: false,
-//                 message: "❌ لم يتم العثور على بيانات الطالب"
-//             });
-//         }
 
-//         // ✅ الوقت الحالي بتوقيت القاهرة
-//         const now = moment.tz("Africa/Cairo");
-//         const startTime = now.clone().hour(21).minute(0).second(0);   // 9:00 PM
-//         const endTime = now.clone().hour(23).minute(59).second(59);  // 11:59:59 PM
 
-//         // ✅ هات الامتحان بتاع اليوم
-//         const startOfDay = now.clone().startOf("day").toDate();
-//         const endOfDay = now.clone().endOf("day").toDate();
-
-//         const exam = await DailyExamModel.findOne({
-//             date: { $gte: startOfDay, $lte: endOfDay }
-//         })
-//             .populate({
-//                 path: "questions",
-//                 model: "DailyQuestion",
-//                 select: "question options mark classId correctAnswer"
-//             })
-//             .populate("classId", "name");
-
-//         if (!exam) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "❌ لا يوجد امتحان لهذا اليوم"
-//             });
-//         }
-
-//         // ✅ تحقق من أن الصف الدراسي للطالب مطابق للامتحان
-//         if (exam.classId._id.toString() !== user.classId.toString()) {
-//             return res.status(403).json({
-//                 success: false,
-//                 message: "❌ الامتحان غير مخصص لصفك الدراسي"
-//             });
-//         }
-
-//         // 🕒 تحقق من وقت الفتح
-//         if (now.isBefore(startTime)) {
-//             const diffMs = startTime.diff(now);
-//             const duration = moment.duration(diffMs);
-//             return res.status(200).json({
-//                 success: true,
-//                 message: "⌛ الامتحان لسه ما فتحش",
-//                 title: exam.title,  // ✅ ضفت العنوان هنا
-//                 willOpenIn: {
-//                     hours: duration.hours(),
-//                     minutes: duration.minutes(),
-//                     seconds: duration.seconds()
-//                 }
-//             });
-//         }
-
-//         if (now.isAfter(endTime)) {
-//             return res.status(403).json({
-//                 success: false,
-//                 message: "❌ انتهى وقت الامتحان اليوم",
-//                 title: exam.title // ✅ حتى لو انتهى تبعته
-//             });
-//         }
-
-//         // ✅ لو الامتحان شغال دلوقتي
-//         const diffMs = endTime.diff(now);
-//         const duration = moment.duration(diffMs);
-//         const remainingTime = {
-//             hours: duration.hours(),
-//             minutes: duration.minutes(),
-//             seconds: duration.seconds()
-//         };
-
-//         res.status(200).json({
-//             success: true,
-//             message: "✅ تم جلب الامتحان النشط",
-//             title: exam.title, // ✅ ضفت العنوان هنا
-//             exam,
-//             remainingTime
-//         });
-
-//     } catch (err) {
-//         res.status(500).json({
-//             success: false,
-//             message: "❌ خطأ أثناء جلب الامتحان",
-//             error: err.message
-//         });
-//     }
-// };
 
 export const getActiveDailyExam = async (req, res) => {
     try {
@@ -2450,3 +2393,192 @@ export const subscribeToExam = async (req, res) => {
         });
     }
 };
+
+
+export const createPost = async (req, res) => {
+    try {
+        const { title, content } = req.body;
+        const author = req.user._id; // من التوكن
+
+        let imageData = null;
+
+        // ⬆️ رفع الصورة إلى Cloudinary
+        if (req.imageFile) {
+            const imageResult = await cloud.uploader.upload(req.imageFile.path, {
+                resource_type: "image",
+                folder: "edapp/posts/images",
+                use_filename: true,
+                unique_filename: false,
+            });
+
+            imageData = {
+                secure_url: imageResult.secure_url,
+                public_id: imageResult.public_id,
+            };
+
+            // 🧹 حذف الصورة من السيرفر بعد الرفع
+            fs.unlinkSync(req.imageFile.path);
+        }
+
+        // 📦 إنشاء المنشور في قاعدة البيانات
+        const post = await PostModel.create({
+            author,
+            title,
+            content,
+            image: imageData,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: "✅ تم إنشاء المنشور بنجاح",
+            post,
+        });
+    } catch (err) {
+        console.error("❌ خطأ أثناء إنشاء المنشور:", err);
+        res.status(500).json({
+            success: false,
+            message: "❌ حدث خطأ أثناء إنشاء المنشور",
+            error: err.message,
+        });
+    }
+};
+
+export const getAllPosts = async (req, res) => {
+    try {
+        const posts = await PostModel.find()
+            .populate("author", "username profilePic")
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // 🧮 نحسب عدد التفاعلات لكل نوع وإجمالي التفاعلات
+        const formattedPosts = posts.map(post => {
+            const likeCount = post.reactions.like?.length || 0;
+            const loveCount = post.reactions.love?.length || 0;
+            const laughCount = post.reactions.laugh?.length || 0;
+            const supportCount = post.reactions.support?.length || 0;
+
+            const totalReactions = likeCount + loveCount + laughCount + supportCount;
+
+            return {
+                ...post,
+                reactionsCount: {
+                    like: likeCount,
+                    love: loveCount,
+                    laugh: laughCount,
+                    support: supportCount,
+                    total: totalReactions
+                }
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "✅ تم جلب المنشورات بنجاح",
+            posts: formattedPosts
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء جلب المنشورات",
+            error: err.message
+        });
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export const reactToPost = async (req, res) => {
+    try {
+        const { postId, type } = req.body; // type = like | love | laugh | support
+        const userId = req.user._id;
+
+        const post = await PostModel.findById(postId);
+        if (!post) return res.status(404).json({ success: false, message: "❌ البوست غير موجود" });
+
+        // احذف المستخدم من كل الريأكشنات
+        for (let key of Object.keys(post.reactions)) {
+            post.reactions[key] = post.reactions[key].filter(id => id.toString() !== userId.toString());
+        }
+
+        // ضيفه في الريأكشن المطلوب
+        post.reactions[type].push(userId);
+        await post.save();
+
+        res.status(200).json({
+            success: true,
+            message: `✅ تمت إضافة تفاعل (${type}) بنجاح`,
+            reactions: post.reactions
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء التفاعل مع المنشور",
+            error: err.message
+        });
+    }
+};
+
+export const addComment = async (req, res) => {
+    try {
+        const { postId, text } = req.body;
+        const userId = req.user._id;
+
+        const post = await PostModel.findById(postId);
+        if (!post) return res.status(404).json({ success: false, message: "❌ البوست غير موجود" });
+
+        const comment = await CommentModel.create({ postId, userId, text });
+        await PostModel.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+
+        res.status(201).json({
+            success: true,
+            message: "✅ تم إضافة التعليق بنجاح",
+            comment
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء إضافة التعليق",
+            error: err.message
+        });
+    }
+};
+
+export const getCommentsByPost = async (req, res) => {
+    try {
+        const { postId } = req.params;
+
+        const comments = await CommentModel.find({ postId })
+            .populate("userId", "username profilePic")
+            .sort({ createdAt: 1 });
+
+        res.status(200).json({
+            success: true,
+            message: "✅ تم جلب التعليقات بنجاح",
+            comments
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء جلب التعليقات",
+            error: err.message
+        });
+    }
+};
+
+

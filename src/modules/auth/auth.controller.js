@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends, getAllUsers } from "./service/regestration.service.js";
-import { answerDailyQuestion, answerQuestion, bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createDailyExam, createDailyQuestion, createExam, createLesson, createRoom, createSubject, createWithdrawal, forgetpassword,   getActiveDailyExam,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getDailyRank,   getExamQuestions,   getExamQuestionsById,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   getWeeklyRank,   login, loginwithGmail, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, subscribeToExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { addComment, answerDailyQuestion, answerQuestion, bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createDailyExam, createDailyQuestion, createExam, createLesson, createPost, createRoom, createSubject, createWithdrawal, forgetpassword,   getActiveDailyExam,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPosts,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getCommentsByPost,   getDailyRank,   getExamQuestions,   getExamQuestionsById,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   getWeeklyRank,   login, loginwithGmail, reactToPost, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, subscribeToExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat, findonechat2 } from "../chat/chat/chat.service.js";
@@ -95,7 +95,30 @@ routr.post(
         next();
     },
    uploadMaterial
-  );
+);
+  
+
+
+routr.post(
+    "/createPost",
+    authentication(),
+
+    uploadCloudFile([...fileValidationTypes.image]).single("image"), // ⬅️ استخدم .single بدل .fields
+
+    (req, res, next) => {
+        // ✅ multer بيحط الصورة داخل req.file لما نستخدم single()
+        if (req.file) {
+            req.imageFile = req.file;
+        } else {
+            req.imageFile = null;
+        }
+        next();
+    },
+
+    createPost
+);
+
+
 
 
     routr.post('/uploadChatAttachment', uploadCloudFile(fileValidationTypes.image).single("file"), authentication(), uploadChatAttachment);
@@ -108,7 +131,7 @@ routr.post("/createDailyExam", createDailyExam)
 routr.post("/createClass", createClass)
 routr.post("/bankCreateGeneralQuestions", bankCreateGeneralQuestions)
 routr.get("/getAllMaterials", getAllMaterials)
-
+routr.get("/getAllPosts", getAllPosts)
 routr.post("/createChapter", authentication(), createChapter)
 routr.post("/createLesson", authentication(), createLesson)
 routr.post("/answerDailyQuestion", authentication(), answerDailyQuestion)
@@ -124,14 +147,16 @@ routr.patch("/updateProfile", authentication(), updateProfile)
 routr.delete("/deleteFile/:fileId", authentication(), deleteFile)
 routr.post("/subscribeToExam/:examId", authentication(), subscribeToExam)
 routr.patch("/updateFileName/:fileId", authentication(), updateFileName)
-
+routr.post("/reactToPost", authentication(), reactToPost)
 routr.get("/getBankQuestionsByClass", authentication(), getBankQuestionsByClass)
 
 routr.get("/getUserEarnings", authentication(), getUserEarnings)
-
+routr.post("/addComment", authentication(), addComment)
 
 routr.get("/getUserFriends", authentication(), getUserFriends)
 routr.get("/findonechat2/:destId",authentication()  ,findonechat2)
+
+routr.get("/getCommentsByPost/:postId", authentication(), getCommentsByPost)
 
 // routr.get('/share/:fileId', incrementFileView(), getSharedFile);
 

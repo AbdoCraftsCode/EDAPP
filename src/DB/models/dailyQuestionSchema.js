@@ -26,7 +26,7 @@ const dailyExamSchema = new mongoose.Schema({
 
     questions: [{ type: mongoose.Schema.Types.ObjectId, ref: "DailyQuestion" }],
 
-    isActive: { type: Boolean, default: false }, // الامتحان شغال ولا لأ
+    isActive: { type: Boolean, default: true }, // الامتحان شغال ولا لأ
 
     entryFee: { type: Number, default: 0 }, // رسوم الاشتراك
 
@@ -65,6 +65,8 @@ const dailyQuestionSchema = new mongoose.Schema({
 const dailyResultSchema = new mongoose.Schema({
     examId: { type: mongoose.Schema.Types.ObjectId, ref: "DailyExam", required: true },
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    reward: { type: Number, default: 0 },
+    rewardGiven: { type: Boolean, default: false },
     score: { type: Number, default: 0 },
     timeTaken: { type: Number, default: 0 }, // بالثواني
     classId: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true }, // نفس الصف
