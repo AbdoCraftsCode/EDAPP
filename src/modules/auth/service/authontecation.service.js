@@ -2495,7 +2495,58 @@ export const getAllPosts = async (req, res) => {
 };
 
 
+export const getUserPosts = async (req, res) => {
+    try {
+        const { userId } = req.params;
 
+        // 🧠 جلب بوستات المستخدم فقط
+        const posts = await PostModel.find({ author: userId })
+            .populate("author", "username profilePic")
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // 🧮 تجهيز كل بوست بنفس التنسيق السابق
+        const formattedPosts = await Promise.all(posts.map(async (post) => {
+            const likeCount = post.reactions.like?.length || 0;
+            const loveCount = post.reactions.love?.length || 0;
+            const laughCount = post.reactions.laugh?.length || 0;
+            const supportCount = post.reactions.support?.length || 0;
+
+            const totalReactions = likeCount + loveCount + laughCount + supportCount;
+
+            // 🗨️ جلب التعليقات الخاصة بالبوست
+            const comments = await CommentModel.find({ postId: post._id })
+                .populate("userId", "username profilePic")
+                .sort({ createdAt: -1 })
+                .lean();
+
+            return {
+                ...post,
+                reactionsCount: {
+                    like: likeCount,
+                    love: loveCount,
+                    laugh: laughCount,
+                    support: supportCount,
+                    total: totalReactions
+                },
+                comments
+            };
+        }));
+
+        res.status(200).json({
+            success: true,
+            message: "✅ تم جلب المنشورات بنجاح",
+            posts: formattedPosts
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "❌ خطأ أثناء جلب منشورات المستخدم",
+            error: err.message
+        });
+    }
+};
 
 
 

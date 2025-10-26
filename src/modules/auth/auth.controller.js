@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validation } from "../../middlewere/validation.middlewere.js";
 import  * as validators from "../auth/auth.validate.js"
 import { addQuestion, adduser, confirmOTP, generateShareLink,createFile, createImages,   getAllImages, getAllRanks, GetFriendsList, getMyRank, Getprofiledata, getQuestionsByClassAndSubject, getSharedFile,  getUserFiles, getUserRoleById, getUserStorageUsage, resendOTP, shareFile, signup, signupwithGmail, submitAnswer, incrementFileView, getShareLinkAnalytics, getUserAnalytics, updateProfile, getUserEarnings, deleteFile, updateFileName, getUserFriends, getAllUsers } from "./service/regestration.service.js";
-import { addComment, answerDailyQuestion, answerQuestion, bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createDailyExam, createDailyQuestion, createExam, createLesson, createPost, createRoom, createSubject, createWithdrawal, forgetpassword,   getActiveDailyExam,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPosts,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getCommentsByPost,   getDailyRank,   getExamQuestions,   getExamQuestionsById,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   getWeeklyRank,   login, loginwithGmail, reactToPost, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, subscribeToExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
+import { addComment, answerDailyQuestion, answerQuestion, bankCreateGeneralQuestions, bulkCreateGeneralQuestions, createChapter, createClass, createDailyExam, createDailyQuestion, createExam, createLesson, createPost, createRoom, createSubject, createWithdrawal, forgetpassword,   getActiveDailyExam,   getAllChapters,   getAllClasses,   getAllLessons,   getAllMaterials,   getAllPosts,   getAllPremiumUsers,   getAllSubjects,   getBankQuestionsByClass,   getChaptersBySubject,   getCommentsByPost,   getDailyRank,   getExamQuestions,   getExamQuestionsById,   getLessonsByChapter,   getMyExamResults,   getMyExamStats,   getMyPremiumStatus,   getRandomQuestionsByClass,   getResultByLesson,   getTopStudentsOverall,   getUserPosts,   getWeeklyRank,   login, loginwithGmail, reactToPost, refreshToken, resetpassword, setUserPremium, submitExam, submitMatchingExam, subscribeToExam, updateLessonImage, updateUserSelf, uploadChatAttachment, uploadLessonResource, uploadMaterial } from "./service/authontecation.service.js";
 import { authentication } from "../../middlewere/authontcation.middlewere.js";
 import { fileValidationTypes, uploadCloudFile } from "../../utlis/multer/cloud.multer.js";
 import { findGroupChat, findonechat2 } from "../chat/chat/chat.service.js";
@@ -152,6 +152,9 @@ routr.get("/getBankQuestionsByClass", authentication(), getBankQuestionsByClass)
 
 routr.get("/getUserEarnings", authentication(), getUserEarnings)
 routr.post("/addComment", authentication(), addComment)
+
+
+routr.get("/getUserPosts/:userId",  getUserPosts)
 
 routr.get("/getUserFriends", authentication(), getUserFriends)
 routr.get("/findonechat2/:destId",authentication()  ,findonechat2)
