@@ -593,11 +593,181 @@ export const sendMessage = (socket) => {
 // };
 
 
+// const waitingUsers = [];
+
+
+// export const handleMatching = (socket) => {
+//     // ⏺️ إضافة المستخدم إلى قائمة الاتصالات
+//     socket.on("registerConnection", ({ userId }) => {
+//         scketConnections.set(userId, socket.id);
+//     });
+
+//     // ✅ بدء المطابقة
+//     socket.on("startMatching", async ({ gender, lookingFor }) => {
+//         const { data } = await authenticationSocket({ socket });
+
+//         if (!data.valid) {
+//             return socket.emit("socketErrorResponse", data);
+//         }
+
+//         const user = data.user;
+//         const userId = user._id.toString();
+//         const classId = user.classId?.toString();
+
+//         console.log("📥 تم استقبال startMatching:", {
+//             userId, gender, lookingFor, classId
+//         });
+
+//         if (!classId) {
+//             return socket.emit("socketErrorResponse", {
+//                 message: "❌ لا يوجد صف دراسي مرتبط بالمستخدم",
+//                 status: 400
+//             });
+//         }
+
+//         const alreadyWaiting = waitingUsers.some(
+//             (u) => u.userId === userId && u.classId === classId
+//         );
+//         if (alreadyWaiting) {
+//             console.log("⛔ المستخدم بالفعل في قائمة الانتظار");
+//             return;
+//         }
+
+//         const matchIndex = waitingUsers.findIndex(
+//             (u) =>
+//                 u.classId === classId &&
+//                 u.gender === lookingFor &&
+//                 u.lookingFor === gender
+//         );
+
+//         if (matchIndex !== -1) {
+//             const matchedUser = waitingUsers.splice(matchIndex, 1)[0];
+//             const roomId = `room-${userId}-${matchedUser.userId}`;
+
+//             // ✅ جلب أسئلة عشوائية بناءً على الصف الدراسي
+//             const questions = await GeneralQuestionModel.aggregate([
+//                 { $match: { classId: new mongoose.Types.ObjectId(classId) } },
+//                 { $sample: { size: 10 } }
+//             ]);
+
+//             console.log("🧠 تم إرسال الأسئلة للطرفين:", questions);
+
+//             // ✅ دالة لجلب إحصائيات المستخدم
+//             const getUserStats = async (id) => {
+//                 const result = await examresultModel.aggregate([
+//                     { $match: { studentId: new mongoose.Types.ObjectId(id) } },
+//                     {
+//                         $group: {
+//                             _id: "$studentId",
+//                             totalScore: { $sum: "$totalScore" },
+//                             maxScore: { $sum: "$maxScore" },
+//                             examsCount: { $sum: 1 }
+//                         }
+//                     },
+//                     {
+//                         $addFields: {
+//                             percentage: {
+//                                 $cond: [
+//                                     { $eq: ["$maxScore", 0] },
+//                                     0,
+//                                     { $multiply: [{ $divide: ["$totalScore", "$maxScore"] }, 100] }
+//                                 ]
+//                             }
+//                         }
+//                     }
+//                 ]);
+
+//                 const user = await Usermodel.findById(id).select("username email classId profilePic userId");
+
+//                 return {
+//                     studentName: user?.username || "مجهول",
+//                     studentEmail: user?.email || "",
+//                     profilePic: user?.profilePic || "",
+//                     classId: user?.classId || "",
+//                     userId: user?.userId || "",
+//                     totalScore: result[0]?.totalScore || 0,
+//                     maxScore: result[0]?.maxScore || 0,
+//                     percentage: `${Math.round(result[0]?.percentage || 0)}%`,
+//                     examsCount: result[0]?.examsCount || 0
+//                 };
+//             };
+
+//             const userStats = await getUserStats(userId);
+//             const matchedStats = await getUserStats(matchedUser.userId);
+
+//             // ✅ إرسال البيانات للطرف الأول
+//             socket.emit("matched", {
+//                 roomId,
+//                 partnerId: matchedUser.userId,
+//                 questions,
+//                 me: userStats,
+//                 opponent: matchedStats
+//             });
+
+//             // ✅ إرسال البيانات للطرف الثاني
+//             if (scketConnections.has(matchedUser.userId)) {
+//                 socket
+//                     .to(scketConnections.get(matchedUser.userId))
+//                     .emit("matched", {
+//                         roomId,
+//                         partnerId: userId,
+//                         questions,
+//                         me: matchedStats,
+//                         opponent: userStats
+//                     });
+//             }
+
+//         } else {
+//             const timeout = setTimeout(() => {
+//                 const index = waitingUsers.findIndex((u) => u.userId === userId);
+//                 if (index !== -1) {
+//                     waitingUsers.splice(index, 1);
+//                     socket.emit("timeout", {
+//                         message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك."
+//                     });
+//                 }
+//             }, 2 * 60 * 1000); // دقيقتين
+
+//             waitingUsers.push({
+//                 userId,
+//                 classId,
+//                 gender,
+//                 lookingFor,
+//                 socketId: socket.id,
+//                 timeout
+//             });
+
+//             console.log("➕ تم إضافة المستخدم لقائمة الانتظار");
+
+//             socket.emit("waiting", {
+//                 message: "⏳ جاري البحث عن شريك مطابق في نفس الصف الدراسي..."
+//             });
+//         }
+//     });
+
+//     // ✅ إزالة المستخدم عند قطع الاتصال
+//     socket.on("disconnect", () => {
+//         const index = waitingUsers.findIndex((u) => u.socketId === socket.id);
+//         if (index !== -1) {
+//             clearTimeout(waitingUsers[index].timeout);
+//             waitingUsers.splice(index, 1);
+//         }
+//     });
+// };
+
+
+
+
+
+
+
+
+
 const waitingUsers = [];
-// const scketConnections = new Map(); // تأكد من استخدام هذا المتغير في مكان آخر لتخزين socket.id
+const activeMatches = new Map();
 
 export const handleMatching = (socket) => {
-    // ⏺️ إضافة المستخدم إلى قائمة الاتصالات
+    // ✅ تسجيل الاتصال
     socket.on("registerConnection", ({ userId }) => {
         scketConnections.set(userId, socket.id);
     });
@@ -605,131 +775,111 @@ export const handleMatching = (socket) => {
     // ✅ بدء المطابقة
     socket.on("startMatching", async ({ gender, lookingFor }) => {
         const { data } = await authenticationSocket({ socket });
-
-        if (!data.valid) {
-            return socket.emit("socketErrorResponse", data);
-        }
+        if (!data.valid) return socket.emit("socketErrorResponse", data);
 
         const user = data.user;
         const userId = user._id.toString();
         const classId = user.classId?.toString();
 
-        console.log("📥 تم استقبال startMatching:", {
-            userId, gender, lookingFor, classId
-        });
+        if (!classId)
+            return socket.emit("socketErrorResponse", { message: "❌ لا يوجد صف دراسي مرتبط بالمستخدم" });
 
-        if (!classId) {
-            return socket.emit("socketErrorResponse", {
-                message: "❌ لا يوجد صف دراسي مرتبط بالمستخدم",
-                status: 400
-            });
-        }
+        const alreadyWaiting = waitingUsers.some(u => u.userId === userId && u.classId === classId);
+        if (alreadyWaiting) return;
 
-        const alreadyWaiting = waitingUsers.some(
-            (u) => u.userId === userId && u.classId === classId
-        );
-        if (alreadyWaiting) {
-            console.log("⛔ المستخدم بالفعل في قائمة الانتظار");
-            return;
-        }
-
+        // 🔍 ابحث عن شريك مطابق
         const matchIndex = waitingUsers.findIndex(
-            (u) =>
-                u.classId === classId &&
-                u.gender === lookingFor &&
-                u.lookingFor === gender
+            u => u.classId === classId && u.gender === lookingFor && u.lookingFor === gender
         );
 
         if (matchIndex !== -1) {
             const matchedUser = waitingUsers.splice(matchIndex, 1)[0];
             const roomId = `room-${userId}-${matchedUser.userId}`;
 
-            // ✅ جلب أسئلة عشوائية بناءً على الصف الدراسي
+            // 🔹 جلب الأسئلة العشوائية
             const questions = await GeneralQuestionModel.aggregate([
                 { $match: { classId: new mongoose.Types.ObjectId(classId) } },
-                { $sample: { size: 10 } }
+                { $sample: { size: 20 } },
+                { $project: { _id: 1, question: 1, options: 1, correctAnswer: 1, mark: 1 } }
             ]);
 
-            console.log("🧠 تم إرسال الأسئلة للطرفين:", questions);
+            if (!questions.length)
+                return socket.emit("socketErrorResponse", { message: "❌ لا توجد أسئلة لهذا الصف" });
 
-            // ✅ دالة لجلب إحصائيات المستخدم
-            const getUserStats = async (id) => {
-                const result = await examresultModel.aggregate([
-                    { $match: { studentId: new mongoose.Types.ObjectId(id) } },
-                    {
-                        $group: {
-                            _id: "$studentId",
-                            totalScore: { $sum: "$totalScore" },
-                            maxScore: { $sum: "$maxScore" },
-                            examsCount: { $sum: 1 }
-                        }
-                    },
-                    {
-                        $addFields: {
-                            percentage: {
-                                $cond: [
-                                    { $eq: ["$maxScore", 0] },
-                                    0,
-                                    { $multiply: [{ $divide: ["$totalScore", "$maxScore"] }, 100] }
-                                ]
-                            }
-                        }
-                    }
-                ]);
-
-                const user = await Usermodel.findById(id).select("username email classId profilePic userId");
-
-                return {
-                    studentName: user?.username || "مجهول",
-                    studentEmail: user?.email || "",
-                    profilePic: user?.profilePic || "",
-                    classId: user?.classId || "",
-                    userId: user?.userId || "",
-                    totalScore: result[0]?.totalScore || 0,
-                    maxScore: result[0]?.maxScore || 0,
-                    percentage: `${Math.round(result[0]?.percentage || 0)}%`,
-                    examsCount: result[0]?.examsCount || 0
-                };
-            };
-
-            const userStats = await getUserStats(userId);
-            const matchedStats = await getUserStats(matchedUser.userId);
-
-            // ✅ إرسال البيانات للطرف الأول
-            socket.emit("matched", {
-                roomId,
-                partnerId: matchedUser.userId,
+            // ✅ حفظ بيانات المباراة
+            activeMatches.set(roomId, {
+                users: [userId, matchedUser.userId],
+                userNames: {
+                    [userId]: user.username,
+                    [matchedUser.userId]: matchedUser.name
+                },
+                userPics: {
+                    [userId]: user.profilePic,
+                    [matchedUser.userId]: matchedUser.profilePic
+                },
+                currentQuestionIndex: 0,
                 questions,
-                me: userStats,
-                opponent: matchedStats
+                scores: { [userId]: 0, [matchedUser.userId]: 0 },
+                previousScores: { [userId]: 0, [matchedUser.userId]: 0 },
+                answeredUsers: new Set(),
+                correctAnsweredUsers: new Set(),
+                questionStartTime: Date.now(),
+                timers: {}
             });
 
-            // ✅ إرسال البيانات للطرف الثاني
-            if (scketConnections.has(matchedUser.userId)) {
-                socket
-                    .to(scketConnections.get(matchedUser.userId))
-                    .emit("matched", {
-                        roomId,
-                        partnerId: userId,
-                        questions,
-                        me: matchedStats,
-                        opponent: userStats
-                    });
+            // ✅ إرسال بيانات المطابقة لكل طرف بنفس منطق الكود القديم
+            const meData = {
+                id: userId,
+                name: user.username,
+                profilePic: user.profilePic,
+                score: 0
+            };
+
+            const opponentData = {
+                id: matchedUser.userId,
+                name: matchedUser.name,
+                profilePic: matchedUser.profilePic,
+                score: 0
+            };
+
+            // 🔸 للطرف الأول
+            socket.emit("matchFound", {
+                roomId,
+                me: meData,
+                opponent: opponentData,
+                questions,
+                message: "🎮 تم العثور على شريك المطابقة!"
+            });
+
+            // 🔸 للطرف الثاني
+            const opponentSocketId = scketConnections.get(matchedUser.userId);
+            if (opponentSocketId) {
+                const io = getIo();
+                io.to(opponentSocketId).emit("matchFound", {
+                    roomId,
+                    me: opponentData,
+                    opponent: meData,
+                    questions,
+                    message: "🎮 تم العثور على شريك المطابقة!"
+                });
             }
+
+            // ⏱️ إرسال أول سؤال بعد ثانيتين
+            setTimeout(() => sendQuestion(roomId), 2000);
 
         } else {
             const timeout = setTimeout(() => {
-                const index = waitingUsers.findIndex((u) => u.userId === userId);
-                if (index !== -1) {
-                    waitingUsers.splice(index, 1);
-                    socket.emit("timeout", {
-                        message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك."
-                    });
+                const i = waitingUsers.findIndex(u => u.userId === userId);
+                if (i !== -1) {
+                    waitingUsers.splice(i, 1);
+                    socket.emit("timeout", { message: "⏳ انتهى وقت البحث، لم يتم العثور على شريك." });
                 }
-            }, 2 * 60 * 1000); // دقيقتين
+            }, 2 * 60 * 1000);
 
             waitingUsers.push({
                 userId,
+                name: user.username,
+                profilePic: user.profilePic,
                 classId,
                 gender,
                 lookingFor,
@@ -737,23 +887,182 @@ export const handleMatching = (socket) => {
                 timeout
             });
 
-            console.log("➕ تم إضافة المستخدم لقائمة الانتظار");
-
-            socket.emit("waiting", {
-                message: "⏳ جاري البحث عن شريك مطابق في نفس الصف الدراسي..."
-            });
+            socket.emit("waiting", { message: "⏳ جاري البحث عن شريك مطابق..." });
         }
     });
 
-    // ✅ إزالة المستخدم عند قطع الاتصال
+    // ✅ استقبال الإجابة
+    socket.on("answerQuestion", async ({ roomId, questionId, selectedAnswer }) => {
+        const match = activeMatches.get(roomId);
+        if (!match) return;
+
+        const { data } = await authenticationSocket({ socket });
+        if (!data.valid) return;
+
+        const userId = data.user._id.toString();
+        const username = match.userNames[userId] || "مستخدم";
+        const { questions, scores, previousScores, currentQuestionIndex, answeredUsers, correctAnsweredUsers } = match;
+        const question = questions[currentQuestionIndex];
+        if (!question) return;
+
+        if (answeredUsers.has(userId)) return;
+        answeredUsers.add(userId);
+
+        const answerTime = (Date.now() - match.questionStartTime) / 1000;
+        const isCorrect = selectedAnswer === question.correctAnswer;
+        let mark = 0;
+
+        if (isCorrect) {
+            mark = correctAnsweredUsers.size === 0 ? question.mark : question.mark / 2;
+            correctAnsweredUsers.add(userId);
+            scores[userId] += mark;
+        }
+
+        previousScores[userId] = scores[userId];
+
+        sendToBoth(roomId, "answerResult", {
+            roomId,
+            answeredBy: userId,
+            playerName: username,
+            playerPic: match.userPics[userId],
+            isCorrect,
+            selectedAnswer,
+            correctAnswer: question.correctAnswer,
+            scores,
+            previousScores,
+            answerTime,
+            mark,
+            players: match.users.map(uid => ({
+                id: uid,
+                name: match.userNames[uid],
+                profilePic: match.userPics[uid],
+                score: scores[uid]
+            })),
+            message: `⚡ ${username} أجاب خلال ${answerTime.toFixed(1)} ثانية ${isCorrect ? `وحصل على ${mark} نقطة` : "❌ إجابة خاطئة"}`
+        });
+
+        if (isCorrect) {
+            clearTimeout(match.timers[currentQuestionIndex]);
+            setTimeout(() => nextQuestion(roomId), 2000);
+        } else if (answeredUsers.size === match.users.length) {
+            const bothWrong = [...answeredUsers].every(uid => !correctAnsweredUsers.has(uid));
+            if (bothWrong) {
+                clearTimeout(match.timers[currentQuestionIndex]);
+                setTimeout(() => nextQuestion(roomId), 2000);
+            }
+        }
+    });
+
     socket.on("disconnect", () => {
-        const index = waitingUsers.findIndex((u) => u.socketId === socket.id);
-        if (index !== -1) {
-            clearTimeout(waitingUsers[index].timeout);
-            waitingUsers.splice(index, 1);
+        const i = waitingUsers.findIndex(u => u.socketId === socket.id);
+        if (i !== -1) {
+            clearTimeout(waitingUsers[i].timeout);
+            waitingUsers.splice(i, 1);
         }
     });
 };
+
+// ✅ إرسال سؤال جديد
+function sendQuestion(roomId) {
+    const match = activeMatches.get(roomId);
+    if (!match) return;
+
+    const { currentQuestionIndex, questions, timers } = match;
+    const question = questions[currentQuestionIndex];
+    if (!question) return;
+
+    match.questionStartTime = Date.now();
+    match.answeredUsers = new Set();
+    match.correctAnsweredUsers = new Set();
+
+    sendToBoth(roomId, "newQuestion", {
+        roomId,
+        index: currentQuestionIndex + 1,
+        total: questions.length,
+        timeLimit: 60,
+        question: {
+            id: question._id,
+            text: question.question,
+            options: question.options
+        }
+    });
+
+    timers[currentQuestionIndex] = setTimeout(() => {
+        sendToBoth(roomId, "questionTimeout", {
+            message: "⏰ انتهى وقت السؤال! الانتقال للسؤال التالي..."
+        });
+        nextQuestion(roomId);
+    }, 60 * 1000);
+}
+
+// ✅ الانتقال للسؤال التالي
+function nextQuestion(roomId) {
+    const match = activeMatches.get(roomId);
+    if (!match) return;
+
+    match.currentQuestionIndex++;
+    if (match.currentQuestionIndex < match.questions.length) {
+        sendQuestion(roomId);
+    } else {
+        endGame(roomId);
+    }
+}
+
+// ✅ إنهاء الجولة
+function endGame(roomId) {
+    const match = activeMatches.get(roomId);
+    if (!match) return;
+
+    const { scores, userNames, userPics, timers } = match;
+    Object.values(timers).forEach(clearTimeout);
+
+    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    const [winnerId, winnerScore] = sorted[0];
+    const winnerName = userNames[winnerId];
+
+    sendToBoth(roomId, "examFinished", {
+        finalScores: scores,
+        winner: {
+            id: winnerId,
+            name: winnerName,
+            profilePic: userPics[winnerId],
+            score: winnerScore,
+            message: `🏆 الفائز هو ${winnerName} بمجموع ${winnerScore} نقطة!`
+        }
+    });
+
+    activeMatches.delete(roomId);
+}
+
+// 🔹 إرسال للطرفين
+function sendToBoth(roomId, event, data) {
+    const match = activeMatches.get(roomId);
+    if (!match) return;
+
+    const io = getIo();
+    match.users.forEach(userId => {
+        const socketId = scketConnections.get(userId);
+        if (socketId) io.to(socketId).emit(event, data);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1957,3 +2266,13 @@ export const handleGetRoomDetailsById = (socket) => {
         }
     });
 };
+
+
+
+
+
+
+ // ✅
+
+
+

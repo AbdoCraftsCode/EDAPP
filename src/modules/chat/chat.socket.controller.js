@@ -5,6 +5,7 @@ import { authenticationSocket } from "../../middlewere/auth.socket.middlewere.js
 
 
 
+
 let io = undefined
 
 export const runIo = (httpServer) => {
@@ -25,6 +26,9 @@ export const runIo = (httpServer) => {
     return io.on("connection", async (socket) => {
         console.log(socket.handshake.auth);
         await sendMessage(socket);
+
+
+
         await regiserSocket(socket);
         await logoutSocket(socket);
         await handleMatching(socket);
