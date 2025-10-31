@@ -767,12 +767,10 @@ const waitingUsers = [];
 const activeMatches = new Map();
 
 export const handleMatching = (socket) => {
-    // ✅ تسجيل الاتصال
     socket.on("registerConnection", ({ userId }) => {
         scketConnections.set(userId, socket.id);
     });
 
-    // ✅ بدء المطابقة
     socket.on("startMatching", async ({ gender, lookingFor }) => {
         const { data } = await authenticationSocket({ socket });
         if (!data.valid) return socket.emit("socketErrorResponse", data);
@@ -787,7 +785,6 @@ export const handleMatching = (socket) => {
         const alreadyWaiting = waitingUsers.some(u => u.userId === userId && u.classId === classId);
         if (alreadyWaiting) return;
 
-        // 🔍 ابحث عن شريك مطابق
         const matchIndex = waitingUsers.findIndex(
             u => u.classId === classId && u.gender === lookingFor && u.lookingFor === gender
         );
@@ -796,7 +793,6 @@ export const handleMatching = (socket) => {
             const matchedUser = waitingUsers.splice(matchIndex, 1)[0];
             const roomId = `room-${userId}-${matchedUser.userId}`;
 
-            // 🔹 جلب الأسئلة العشوائية
             const questions = await GeneralQuestionModel.aggregate([
                 { $match: { classId: new mongoose.Types.ObjectId(classId) } },
                 { $sample: { size: 20 } },
@@ -806,7 +802,6 @@ export const handleMatching = (socket) => {
             if (!questions.length)
                 return socket.emit("socketErrorResponse", { message: "❌ لا توجد أسئلة لهذا الصف" });
 
-            // ✅ حفظ بيانات المباراة
             activeMatches.set(roomId, {
                 users: [userId, matchedUser.userId],
                 userNames: {
@@ -827,7 +822,6 @@ export const handleMatching = (socket) => {
                 timers: {}
             });
 
-            // ✅ إرسال بيانات المطابقة لكل طرف بنفس منطق الكود القديم
             const meData = {
                 id: userId,
                 name: user.username,
@@ -842,29 +836,24 @@ export const handleMatching = (socket) => {
                 score: 0
             };
 
-            // 🔸 للطرف الأول
-            socket.emit("matchFound", {
+            // ✅ إرسال بنفس شكل الـ answerResult (players array)
+            const matchPayload = {
                 roomId,
-                me: meData,
-                opponent: opponentData,
-                questions,
+                players: [meData, opponentData],
                 message: "🎮 تم العثور على شريك المطابقة!"
-            });
+            };
 
-            // 🔸 للطرف الثاني
+            socket.emit("matchFound", matchPayload);
+
             const opponentSocketId = scketConnections.get(matchedUser.userId);
             if (opponentSocketId) {
                 const io = getIo();
                 io.to(opponentSocketId).emit("matchFound", {
-                    roomId,
-                    me: opponentData,
-                    opponent: meData,
-                    questions,
-                    message: "🎮 تم العثور على شريك المطابقة!"
+                    ...matchPayload,
+                    players: [opponentData, meData]
                 });
             }
 
-            // ⏱️ إرسال أول سؤال بعد ثانيتين
             setTimeout(() => sendQuestion(roomId), 2000);
 
         } else {
@@ -891,7 +880,6 @@ export const handleMatching = (socket) => {
         }
     });
 
-    // ✅ استقبال الإجابة
     socket.on("answerQuestion", async ({ roomId, questionId, selectedAnswer }) => {
         const match = activeMatches.get(roomId);
         if (!match) return;
@@ -962,7 +950,6 @@ export const handleMatching = (socket) => {
     });
 };
 
-// ✅ إرسال سؤال جديد
 function sendQuestion(roomId) {
     const match = activeMatches.get(roomId);
     if (!match) return;
@@ -995,7 +982,6 @@ function sendQuestion(roomId) {
     }, 60 * 1000);
 }
 
-// ✅ الانتقال للسؤال التالي
 function nextQuestion(roomId) {
     const match = activeMatches.get(roomId);
     if (!match) return;
@@ -1008,7 +994,6 @@ function nextQuestion(roomId) {
     }
 }
 
-// ✅ إنهاء الجولة
 function endGame(roomId) {
     const match = activeMatches.get(roomId);
     if (!match) return;
@@ -1034,7 +1019,6 @@ function endGame(roomId) {
     activeMatches.delete(roomId);
 }
 
-// 🔹 إرسال للطرفين
 function sendToBoth(roomId, event, data) {
     const match = activeMatches.get(roomId);
     if (!match) return;
@@ -1045,6 +1029,7 @@ function sendToBoth(roomId, event, data) {
         if (socketId) io.to(socketId).emit(event, data);
     });
 }
+
 
 
 
