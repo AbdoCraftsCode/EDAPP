@@ -1009,7 +1009,7 @@ export const getMyExamStats = async (req, res) => {
 
         // ✅ جلب بيانات المستخدم (مع البريميوم)
         const user = await Usermodel.findById(studentId)
-            .select("username email classId profilePic userId gender isPremium premiumUntil");
+            .select("username email classId profilePic userId gender isPremium premiumUntil myWallet");
 
         if (!user) {
             return res.status(404).json({ message: "❌ لم يتم العثور على الطالب" });
@@ -1019,12 +1019,15 @@ export const getMyExamStats = async (req, res) => {
         const stats = {
             studentName: user.username || "مجهول",
             studentEmail: user.email || "",
+            myWallet: user.myWallet || "",
             profilePic: user.profilePic || "",
             classId: user.classId || "",
             _id: user._id || "",
             userId: user.userId || "",
             gender: user.gender || "",
             totalScore: result[0]?.totalScore || 0,
+         
+
             maxScore: result[0]?.maxScore || 0,
             percentage: `${Math.round(result[0]?.percentage || 0)}%`,
             examsCount: result[0]?.examsCount || 0
