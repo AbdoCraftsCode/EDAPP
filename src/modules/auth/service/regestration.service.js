@@ -1368,6 +1368,20 @@ export const getNotifications = asyncHandelr(async (req, res, next) => {
 
 
 
+export const markAllNotificationsAsRead = asyncHandelr(async (req, res, next) => {
+    // 🔹 تحديث جميع الإشعارات الخاصة بالمستخدم
+    const result = await NotificationModelll.updateMany(
+        { receiverId: req.user._id, isRead: false },
+        { $set: { isRead: true } }
+    );
+
+    return successresponse(res, {
+        message: "✅ تم تحديد جميع الإشعارات كمقروءة بنجاح",
+        updatedCount: result.modifiedCount
+    });
+});
+
+
 
 
 
