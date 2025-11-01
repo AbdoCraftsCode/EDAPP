@@ -9,6 +9,12 @@ const userSchema = new mongoose.Schema(
     {
 
         friends: [{ type: Types.ObjectId, ref: "User" }],
+        sentRequests: [{ type: Types.ObjectId, ref: "User" }],
+
+        friendRequests: [{ type: Types.ObjectId, ref: "User" }], // 🟡 الطلبات المعلقة
+        followers: [{ type: Types.ObjectId, ref: "User" }],      // 🟢 المتابعين
+        following: [{ type: Types.ObjectId, ref: "User" }],      // 🔵 من يتابعهم المستخدم
+
         email: { type: String, unique: true, required: true },
         password: { type: String },
         provider: { type: String, enum: Object.values(providerTypes),default:providerTypes.system },

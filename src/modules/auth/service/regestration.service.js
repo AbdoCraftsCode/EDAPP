@@ -1283,6 +1283,132 @@ export const adduser = asyncHandelr(async (req, res, next) => {
 
 
 
+
+export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
+    const { friendId } = req.params;
+
+    if (friendId === req.user._id.toString()) {
+        return next(new Error("لا يمكنك إرسال طلب صداقة لنفسك", { cause: 400 }));
+    }
+
+    const friend = await Usermodel.findById(friendId);
+    if (!friend) return next(new Error("المستخدم غير موجود", { cause: 404 }));
+
+    // ✅ التأكد إن الطلب مش مكرر أو إنهم بالفعل أصدقاء
+    if (
+        friend.friendRequests.includes(req.user._id) ||
+        friend.friends.includes(req.user._id)
+    ) {
+        return next(new Error("تم إرسال الطلب مسبقًا أو أنتما بالفعل أصدقاء", { cause: 400 }));
+    }
+
+    // 🔹 حفظ الطلب عند المستقبل
+    await friend.updateOne({ $addToSet: { friendRequests: req.user._id } });
+
+    // 🔹 حفظ أنه تم الإرسال عند المرسل
+    await Usermodel.findByIdAndUpdate(req.user._id, {
+        $addToSet: { sentRequests: friendId },
+    });
+
+    return successresponse(res, { message: "✅ تم إرسال طلب الصداقة بنجاح" });
+});
+
+
+
+export const getFriendData = asyncHandelr(async (req, res, next) => {
+    const userId = req.user._id;
+
+    const user = await Usermodel.findById(userId)
+        .populate({
+            path: "friendRequests",
+            select: "_id username profilePic",
+        })
+        .populate({
+            path: "sentRequests",
+            select: "_id username profilePic",
+        })
+        .populate({
+            path: "friends",
+            select: "_id username profilePic",
+        })
+        .lean();
+
+    if (!user) return next(new Error("❌ المستخدم غير موجود", { cause: 404 }));
+
+    // ✅ تجهيز البيانات النهائية
+    const response = {
+        friendRequests: {
+            count: user.friendRequests?.length || 0,
+            list: user.friendRequests?.map(f => ({
+                id: f._id,
+                name: f.username,
+                profilePic: f.profilePic?.secure_url || null,
+            })),
+        },
+        sentRequests: {
+            count: user.sentRequests?.length || 0,
+            list: user.sentRequests?.map(f => ({
+                id: f._id,
+                name: f.username,
+                profilePic: f.profilePic?.secure_url || null,
+            })),
+        },
+        friends: {
+            count: user.friends?.length || 0,
+            list: user.friends?.map(f => ({
+                id: f._id,
+                name: f.username,
+                profilePic: f.profilePic?.secure_url || null,
+            })),
+        },
+    };
+
+    return successresponse(res, {
+        message: "✅ تم جلب بيانات الأصدقاء بنجاح",
+        data: response,
+    });
+});
+
+
+
+
+export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
+    const { friendId } = req.params;
+
+    if (friendId === req.user._id.toString()) {
+        return next(new Error("لا يمكنك قبول طلب صداقة من نفسك", { cause: 400 }));
+    }
+
+    const friend = await Usermodel.findById(friendId);
+    if (!friend) return next(new Error("المستخدم غير موجود", { cause: 404 }));
+
+    // ✅ تأكد أن فعلاً في طلب صداقة من هذا الشخص
+    const hasRequest = req.user.friendRequests.includes(friendId);
+    if (!hasRequest) {
+        return next(new Error("❌ لا يوجد طلب صداقة من هذا المستخدم", { cause: 400 }));
+    }
+
+    // 🔹 1. إزالة الطلب من friendRequests عند المستخدم الحالي
+    await Usermodel.findByIdAndUpdate(req.user._id, {
+        $pull: { friendRequests: friendId },
+        $addToSet: { friends: friendId },
+    });
+
+    // 🔹 2. إزالة الطلب من sentRequests عند الطرف الآخر
+    await Usermodel.findByIdAndUpdate(friendId, {
+        $pull: { sentRequests: req.user._id },
+        $addToSet: { friends: req.user._id },
+    });
+
+    return successresponse(res, { message: "✅ تم قبول طلب الصداقة بنجاح" });
+});
+
+
+
+
+
+
+
 export const getUserFriends = asyncHandelr(async (req, res, next) => {
     const userId = req.user._id;
 
