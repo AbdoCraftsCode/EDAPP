@@ -1,7 +1,7 @@
 import { asyncHandelr } from "../../../utlis/response/error.response.js";
 import { Emailevent } from "../../../utlis/events/email.emit.js";
 import *as dbservice from "../../../DB/dbservice.js"
-import Usermodel, { providerTypes, roletypes } from "../../../DB/models/User.model.js";
+import Usermodel, { providerTypes, roletypes, scketConnections } from "../../../DB/models/User.model.js";
 import { comparehash, encryptData, generatehash } from "../../../utlis/security/hash.security.js";
 import { successresponse } from "../../../utlis/response/success.response.js";
 import { OAuth2Client } from "google-auth-library";
@@ -25,6 +25,8 @@ import axios from 'axios';
 import mongoose from "mongoose";
 import geoip from 'geoip-lite';
 import { getName } from 'country-list';
+import { getIo } from "../../chat/chat.socket.controller.js";
+import { NotificationModelll } from "../../../DB/models/NotificationModelll.js";
 // export const signup = asyncHandelr(async (req, res, next) => {
     
 //     const { username, email, confirmationpassword, DOB, password, mobileNumber } = req.body
@@ -1294,7 +1296,7 @@ export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
     const friend = await Usermodel.findById(friendId);
     if (!friend) return next(new Error("المستخدم غير موجود", { cause: 404 }));
 
-    // ✅ التأكد إن الطلب مش مكرر أو إنهم بالفعل أصدقاء
+    // ✅ التأكد من عدم وجود طلب مسبق أو صداقة
     if (
         friend.friendRequests.includes(req.user._id) ||
         friend.friends.includes(req.user._id)
@@ -1302,16 +1304,71 @@ export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
         return next(new Error("تم إرسال الطلب مسبقًا أو أنتما بالفعل أصدقاء", { cause: 400 }));
     }
 
-    // 🔹 حفظ الطلب عند المستقبل
+    // ✅ حفظ الطلب عند المستقبل
     await friend.updateOne({ $addToSet: { friendRequests: req.user._id } });
 
-    // 🔹 حفظ أنه تم الإرسال عند المرسل
+    // ✅ حفظ الطلب المرسل عند المرسل
     await Usermodel.findByIdAndUpdate(req.user._id, {
         $addToSet: { sentRequests: friendId },
     });
 
+    // ✅ إنشاء إشعار جديد
+    const notification = await NotificationModelll.create({
+        receiverId: friendId,
+        senderId: req.user._id,
+        type: "friend_request",
+        title: "📩 طلب صداقة جديد",
+        body: `${req.user.username} أرسل إليك طلب صداقة`,
+    });
+
+    // ✅ إرسال إشعار لحظي للطرف المستقبل
+    const io = getIo();
+    const receiverSocket = scketConnections.get(friendId);
+
+    if (receiverSocket) {
+        io.to(receiverSocket).emit("newNotification", {
+            id: notification._id,
+            type: notification.type,
+            title: notification.title,
+            body: notification.body,
+            sender: {
+                id: req.user._id,
+                name: req.user.username,
+                profilePic: req.user.profilePic,
+            },
+            createdAt: notification.createdAt,
+        });
+    }
+
     return successresponse(res, { message: "✅ تم إرسال طلب الصداقة بنجاح" });
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+export const getNotifications = asyncHandelr(async (req, res, next) => {
+    const notifications = await NotificationModelll.find({ receiverId: req.user._id })
+        .populate("senderId", "username profilePic")
+        .sort({ createdAt: -1 });
+
+    return successresponse(res, {
+        count: notifications.length,
+        notifications,
+    });
 });
+
+
+
+
 
 
 
