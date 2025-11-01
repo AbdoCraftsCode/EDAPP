@@ -1368,6 +1368,9 @@ export const getNotifications = asyncHandelr(async (req, res, next) => {
 
 
 
+
+
+
 export const markAllNotificationsAsRead = asyncHandelr(async (req, res, next) => {
     // 🔹 تحديث جميع الإشعارات الخاصة بالمستخدم
     const result = await NotificationModelll.updateMany(
@@ -1442,37 +1445,68 @@ export const getFriendData = asyncHandelr(async (req, res, next) => {
 
 
 
-
 export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
     const { friendId } = req.params;
 
     if (friendId === req.user._id.toString()) {
-        return next(new Error("لا يمكنك قبول طلب صداقة من نفسك", { cause: 400 }));
+        return next(new Error("❌ لا يمكنك قبول طلب صداقة من نفسك", { cause: 400 }));
     }
 
     const friend = await Usermodel.findById(friendId);
     if (!friend) return next(new Error("المستخدم غير موجود", { cause: 404 }));
 
-    // ✅ تأكد أن فعلاً في طلب صداقة من هذا الشخص
+    // ✅ تأكد أن في طلب صداقة من هذا الشخص
     const hasRequest = req.user.friendRequests.includes(friendId);
     if (!hasRequest) {
         return next(new Error("❌ لا يوجد طلب صداقة من هذا المستخدم", { cause: 400 }));
     }
 
-    // 🔹 1. إزالة الطلب من friendRequests عند المستخدم الحالي
+    // 🔹 إزالة الطلب من friendRequests وإضافة الصديق
     await Usermodel.findByIdAndUpdate(req.user._id, {
         $pull: { friendRequests: friendId },
         $addToSet: { friends: friendId },
     });
 
-    // 🔹 2. إزالة الطلب من sentRequests عند الطرف الآخر
+    // 🔹 إزالة الطلب من sentRequests وإضافة الصديق للطرف الآخر
     await Usermodel.findByIdAndUpdate(friendId, {
         $pull: { sentRequests: req.user._id },
         $addToSet: { friends: req.user._id },
     });
 
+    // ✅ إنشاء إشعار جديد عند الطرف الآخر (الذي تم قبول طلبه)
+    const notification = await NotificationModelll.create({
+        receiverId: friendId, // الشخص اللي تم قبول طلبه
+        senderId: req.user._id, // الشخص اللي قبل الطلب
+        type: "friend_accept",
+        title: "🤝 تم قبول طلب الصداقة",
+        body: `${req.user.username} قبل طلب صداقتك`,
+    });
+
+    // ✅ إرسال إشعار لحظي للطرف الآخر
+    const io = getIo();
+    const receiverSocket = scketConnections.get(friendId);
+
+    if (receiverSocket) {
+        io.to(receiverSocket).emit("newNotification", {
+            id: notification._id,
+            type: notification.type,
+            title: notification.title,
+            body: notification.body,
+            sender: {
+                id: req.user._id,
+                name: req.user.username,
+                profilePic: req.user.profilePic,
+            },
+            createdAt: notification.createdAt,
+        });
+    }
+
     return successresponse(res, { message: "✅ تم قبول طلب الصداقة بنجاح" });
 });
+
+
+
+
 
 
 
