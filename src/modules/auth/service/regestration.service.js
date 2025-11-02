@@ -738,6 +738,10 @@ export const getAllUsers = asyncHandelr(async (req, res) => {
         data,
     });
 });
+
+
+
+
 export const updateProfile = asyncHandelr(async (req, res, next) => {
     const { watchingplan, Downloadsplan, isPromoter } = req.body;
 

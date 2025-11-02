@@ -2465,6 +2465,9 @@ export const createPost = async (req, res) => {
 
 export const getAllPosts = async (req, res) => {
     try {
+        // 🧠 جلب أصدقاء المستخدم الحالي
+        const currentUser = await Usermodel.findById(req.user._id).select("friends");
+
         // 🧠 جلب كل البوستات مع بيانات الكاتب
         const posts = await PostModel.find()
             .populate("author", "username profilePic")
@@ -2486,8 +2489,19 @@ export const getAllPosts = async (req, res) => {
                 .sort({ createdAt: -1 })
                 .lean();
 
+            // ✅ أضف isFriend لكل تعليق
+            const formattedComments = comments.map(comment => ({
+                ...comment,
+                isFriend: currentUser.friends.some(
+                    friendId => friendId.toString() === comment.userId._id.toString()
+                ),
+            }));
+
             return {
                 ...post,
+                isFriend: currentUser.friends.some(
+                    friendId => friendId.toString() === post.author._id.toString()
+                ), // ✅ تحقق من أن كاتب البوست صديق
                 reactionsCount: {
                     like: likeCount,
                     love: loveCount,
@@ -2495,7 +2509,7 @@ export const getAllPosts = async (req, res) => {
                     support: supportCount,
                     total: totalReactions
                 },
-                comments
+                comments: formattedComments
             };
         }));
 
@@ -2513,6 +2527,16 @@ export const getAllPosts = async (req, res) => {
         });
     }
 };
+
+
+
+
+
+
+
+
+
+
 
 
 export const getUserPosts = async (req, res) => {
