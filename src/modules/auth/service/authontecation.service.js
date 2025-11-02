@@ -1,4 +1,4 @@
-import Usermodel, { providerTypes, roletypes } from "../../../DB/models/User.model.js";
+import Usermodel, { providerTypes, roletypes, scketConnections } from "../../../DB/models/User.model.js";
 import * as dbservice from "../../../DB/dbservice.js"
 import { asyncHandelr } from "../../../utlis/response/error.response.js";
 import { comparehash, generatehash } from "../../../utlis/security/hash.security.js";
@@ -26,7 +26,7 @@ import { BankQuestionModel } from "../../../DB/models/BankQuestionModel.js";
 import { RoomModell } from "../../../DB/models/roomSchemaaa.js";
 import { WeeklyScoreModel } from "../../../DB/models/weeklyScoreSchema.js";
 import { AnsweredModel } from "../../../DB/models/answeredSchema.js";
-
+import admin from "firebase-admin";
 // import moment from "moment";
 import { DailyAnswerModel, DailyExamModel, DailyQuestionModel, DailyResultModel } from "../../../DB/models/dailyQuestionSchema.js";
 
@@ -2083,6 +2083,8 @@ import cron from "node-cron";
 import moment from "moment-timezone";
 import { PostModel } from "../../../DB/models/postSchema.model.js";
 import { CommentModel } from "../../../DB/models/commentSchema.model.js";
+import { getIo } from "../../chat/chat.socket.controller.js";
+import { NotificationModelll } from "../../../DB/models/NotificationModelll.js";
 
 // 📌 كرون كل يوم 12 بالليل بتوقيت القاهرة
 cron.schedule("0 0 * * *", async () => {
@@ -2579,24 +2581,79 @@ export const getUserPosts = async (req, res) => {
 
 
 
-
 export const reactToPost = async (req, res) => {
     try {
-        const { postId, type } = req.body; // type = like | love | laugh | support
+        const { postId, type } = req.body; // like | love | laugh | support
         const userId = req.user._id;
 
-        const post = await PostModel.findById(postId);
+        const post = await PostModel.findById(postId).populate("author", "username fcmToken profilePic");
         if (!post) return res.status(404).json({ success: false, message: "❌ البوست غير موجود" });
 
-        // احذف المستخدم من كل الريأكشنات
+        // 🧹 إزالة المستخدم من جميع الريأكشنات السابقة
         for (let key of Object.keys(post.reactions)) {
             post.reactions[key] = post.reactions[key].filter(id => id.toString() !== userId.toString());
         }
 
-        // ضيفه في الريأكشن المطلوب
+        // ❤️ إضافة الريأكشن الجديد
         post.reactions[type].push(userId);
         await post.save();
 
+        // ✅ إرسال إشعار لصاحب البوست فقط لو المستخدم مش هو نفسه صاحب البوست
+        if (post.author._id.toString() !== userId.toString()) {
+            // إنشاء الإشعار في قاعدة البيانات
+            const notification = await NotificationModelll.create({
+                receiverId: post.author._id,
+                senderId: req.user._id,
+                type: "post_reaction",
+                title: "❤️ تفاعل جديد على منشورك",
+                body: `${req.user.username} عمل ${type} على منشورك`,
+            });
+
+            // 🔥 إرسال الإشعار عبر Socket.IO
+            const io = getIo();
+            const receiverSocket = scketConnections.get(post.author._id.toString());
+            if (receiverSocket) {
+                io.to(receiverSocket).emit("newNotification", {
+                    id: notification._id,
+                    type: notification.type,
+                    title: notification.title,
+                    body: notification.body,
+                    sender: {
+                        id: req.user._id,
+                        name: req.user.username,
+                        profilePic: req.user.profilePic,
+                    },
+                    createdAt: notification.createdAt,
+                });
+            }
+
+            // 🔥 إرسال الإشعار على الموبايل عبر FCM
+            if (post.author.fcmToken) {
+                try {
+                    await admin.messaging().send({
+                        notification: {
+                            title: "❤️ تفاعل جديد على منشورك",
+                            body: `${req.user.username} عمل ${type} على منشورك`,
+                        },
+                        data: {
+                            type: "post_reaction",
+                            senderId: req.user._id.toString(),
+                            receiverId: post.author._id.toString(),
+                            postId: postId.toString(),
+                            createdAt: notification.createdAt.toISOString(),
+                        },
+                        token: post.author.fcmToken,
+                    });
+                    console.log("✅ تم إرسال إشعار FCM بنجاح");
+                } catch (error) {
+                    console.error("❌ فشل إرسال إشعار FCM:", error);
+                }
+            } else {
+                console.log("⚠️ المستخدم لا يملك fcmToken");
+            }
+        }
+
+        // ✅ الرد النهائي
         res.status(200).json({
             success: true,
             message: `✅ تمت إضافة تفاعل (${type}) بنجاح`,
@@ -2604,6 +2661,7 @@ export const reactToPost = async (req, res) => {
         });
 
     } catch (err) {
+        console.error(err);
         res.status(500).json({
             success: false,
             message: "❌ خطأ أثناء التفاعل مع المنشور",
@@ -2612,17 +2670,86 @@ export const reactToPost = async (req, res) => {
     }
 };
 
+
+
+
+
+
+
+
+
+
+
+
 export const addComment = async (req, res) => {
     try {
         const { postId, text } = req.body;
         const userId = req.user._id;
 
-        const post = await PostModel.findById(postId);
+        const post = await PostModel.findById(postId).populate("author", "username fcmToken profilePic");
         if (!post) return res.status(404).json({ success: false, message: "❌ البوست غير موجود" });
 
+        // 📝 إنشاء التعليق
         const comment = await CommentModel.create({ postId, userId, text });
         await PostModel.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
 
+        // ✅ لو الشخص اللي علق مش هو صاحب البوست — أرسل إشعار
+        if (post.author._id.toString() !== userId.toString()) {
+            const notification = await NotificationModelll.create({
+                receiverId: post.author._id,
+                senderId: req.user._id,
+                type: "post_comment",
+                title: "💬 تعليق جديد على منشورك",
+                body: `${req.user.username} علّق على منشورك: "${text}"`,
+            });
+
+            // 🔥 إرسال الإشعار عبر Socket.IO
+            const io = getIo();
+            const receiverSocket = scketConnections.get(post.author._id.toString());
+            if (receiverSocket) {
+                io.to(receiverSocket).emit("newNotification", {
+                    id: notification._id,
+                    type: notification.type,
+                    title: notification.title,
+                    body: notification.body,
+                    sender: {
+                        id: req.user._id,
+                        name: req.user.username,
+                        profilePic: req.user.profilePic,
+                    },
+                    createdAt: notification.createdAt,
+                });
+            }
+
+            // 🔥 إرسال الإشعار عبر Firebase Cloud Messaging
+            if (post.author.fcmToken) {
+                try {
+                    await admin.messaging().send({
+                        notification: {
+                            title: "💬 تعليق جديد على منشورك",
+                            body: `${req.user.username} علّق على منشورك: "${text}"`,
+                        },
+                        data: {
+                            type: "post_comment",
+                            senderId: req.user._id.toString(),
+                            receiverId: post.author._id.toString(),
+                            postId: postId.toString(),
+                            commentId: comment._id.toString(),
+                            createdAt: notification.createdAt.toISOString(),
+                        },
+                        token: post.author.fcmToken,
+                    });
+
+                    console.log("✅ تم إرسال إشعار FCM بنجاح");
+                } catch (error) {
+                    console.error("❌ فشل إرسال إشعار FCM:", error);
+                }
+            } else {
+                console.log("⚠️ المستخدم لا يملك fcmToken");
+            }
+        }
+
+        // ✅ الرد النهائي
         res.status(201).json({
             success: true,
             message: "✅ تم إضافة التعليق بنجاح",
@@ -2636,6 +2763,18 @@ export const addComment = async (req, res) => {
         });
     }
 };
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const getCommentsByPost = async (req, res) => {
     try {

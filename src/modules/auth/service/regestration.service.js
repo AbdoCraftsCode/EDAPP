@@ -1284,24 +1284,24 @@ export const adduser = asyncHandelr(async (req, res, next) => {
 });
 
 
-
+import admin from "firebase-admin";
 
 export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
     const { friendId } = req.params;
 
     if (friendId === req.user._id.toString()) {
-        return next(new Error("لا يمكنك إرسال طلب صداقة لنفسك", { cause: 400 }));
+        return next(new Error("❌ لا يمكنك إرسال طلب صداقة لنفسك", { cause: 400 }));
     }
 
     const friend = await Usermodel.findById(friendId);
-    if (!friend) return next(new Error("المستخدم غير موجود", { cause: 404 }));
+    if (!friend) return next(new Error("⚠️ المستخدم غير موجود", { cause: 404 }));
 
     // ✅ التأكد من عدم وجود طلب مسبق أو صداقة
     if (
         friend.friendRequests.includes(req.user._id) ||
         friend.friends.includes(req.user._id)
     ) {
-        return next(new Error("تم إرسال الطلب مسبقًا أو أنتما بالفعل أصدقاء", { cause: 400 }));
+        return next(new Error("❌ تم إرسال الطلب مسبقًا أو أنتما بالفعل أصدقاء", { cause: 400 }));
     }
 
     // ✅ حفظ الطلب عند المستقبل
@@ -1312,7 +1312,7 @@ export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
         $addToSet: { sentRequests: friendId },
     });
 
-    // ✅ إنشاء إشعار جديد
+    // ✅ إنشاء إشعار جديد في قاعدة البيانات
     const notification = await NotificationModelll.create({
         receiverId: friendId,
         senderId: req.user._id,
@@ -1321,10 +1321,9 @@ export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
         body: `${req.user.username} أرسل إليك طلب صداقة`,
     });
 
-    // ✅ إرسال إشعار لحظي للطرف المستقبل
+    // ✅ إرسال إشعار لحظي عبر Socket.IO (لو الشخص أونلاين)
     const io = getIo();
     const receiverSocket = scketConnections.get(friendId);
-
     if (receiverSocket) {
         io.to(receiverSocket).emit("newNotification", {
             id: notification._id,
@@ -1340,8 +1339,41 @@ export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
         });
     }
 
+    // ✅ إرسال إشعار على الموبايل عبر Firebase Cloud Messaging (لو عنده fcmToken)
+    if (friend.fcmToken) {
+        try {
+            await admin.messaging().send({
+                notification: {
+                    title: "📩 طلب صداقة جديد",
+                    body: `${req.user.username} أرسل إليك طلب صداقة`,
+                },
+                data: {
+                    type: "friend_request",
+                    senderId: req.user._id.toString(),
+                    receiverId: friendId.toString(),
+                    createdAt: notification.createdAt.toISOString(),
+                },
+                token: friend.fcmToken,
+            });
+
+            console.log("✅ تم إرسال إشعار FCM بنجاح");
+        } catch (error) {
+            console.error("❌ فشل إرسال إشعار FCM:", error);
+        }
+    } else {
+        console.log("⚠️ المستخدم لا يملك fcmToken");
+    }
+
     return successresponse(res, { message: "✅ تم إرسال طلب الصداقة بنجاح" });
-})
+});
+
+
+
+
+
+
+
+
 
 
 
@@ -1445,6 +1477,7 @@ export const getFriendData = asyncHandelr(async (req, res, next) => {
 
 
 
+
 export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
     const { friendId } = req.params;
 
@@ -1453,7 +1486,7 @@ export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
     }
 
     const friend = await Usermodel.findById(friendId);
-    if (!friend) return next(new Error("المستخدم غير موجود", { cause: 404 }));
+    if (!friend) return next(new Error("⚠️ المستخدم غير موجود", { cause: 404 }));
 
     // ✅ تأكد أن في طلب صداقة من هذا الشخص
     const hasRequest = req.user.friendRequests.includes(friendId);
@@ -1473,7 +1506,7 @@ export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
         $addToSet: { friends: req.user._id },
     });
 
-    // ✅ إنشاء إشعار جديد عند الطرف الآخر (الذي تم قبول طلبه)
+    // ✅ إنشاء إشعار جديد في قاعدة البيانات
     const notification = await NotificationModelll.create({
         receiverId: friendId, // الشخص اللي تم قبول طلبه
         senderId: req.user._id, // الشخص اللي قبل الطلب
@@ -1482,10 +1515,9 @@ export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
         body: `${req.user.username} قبل طلب صداقتك`,
     });
 
-    // ✅ إرسال إشعار لحظي للطرف الآخر
+    // ✅ إشعار لحظي عبر Socket.IO (لو المستخدم أونلاين)
     const io = getIo();
     const receiverSocket = scketConnections.get(friendId);
-
     if (receiverSocket) {
         io.to(receiverSocket).emit("newNotification", {
             id: notification._id,
@@ -1501,9 +1533,33 @@ export const acceptFriendRequest = asyncHandelr(async (req, res, next) => {
         });
     }
 
+    // ✅ إشعار عبر Firebase Cloud Messaging (لو عنده fcmToken)
+    if (friend.fcmToken) {
+        try {
+            await admin.messaging().send({
+                notification: {
+                    title: "🤝 تم قبول طلب الصداقة",
+                    body: `${req.user.username} قبل طلب صداقتك`,
+                },
+                data: {
+                    type: "friend_accept",
+                    senderId: req.user._id.toString(),
+                    receiverId: friendId.toString(),
+                    createdAt: notification.createdAt.toISOString(),
+                },
+                token: friend.fcmToken,
+            });
+
+            console.log("✅ تم إرسال إشعار FCM (قبول صداقة) بنجاح");
+        } catch (error) {
+            console.error("❌ فشل إرسال إشعار FCM (قبول صداقة):", error);
+        }
+    } else {
+        console.log("⚠️ المستخدم لا يملك fcmToken");
+    }
+
     return successresponse(res, { message: "✅ تم قبول طلب الصداقة بنجاح" });
 });
-
 
 
 

@@ -608,6 +608,7 @@ export const deleteFolder = asyncHandelr(async (req, res) => {
 
 
 
+
 admin.initializeApp({
     credential: admin.credential.cert({
         type: process.env.FIREBASE_TYPE,
@@ -616,14 +617,14 @@ admin.initializeApp({
         private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
         client_email: process.env.FIREBASE_CLIENT_EMAIL,
         client_id: process.env.FIREBASE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.FIREBASE_CLIENT_EMAIL ?? "")}`,
+        auth_uri: process.env.FIREBASE_AUTH_URI,
+        token_uri: process.env.FIREBASE_TOKEN_URI,
+        auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
+        client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
     }),
 });
 
-async function sendNotification(deviceToken, title, body) {
+export async function sendNotification(deviceToken, title, body) {
     const message = {
         notification: { title, body },
         token: deviceToken,
@@ -631,13 +632,15 @@ async function sendNotification(deviceToken, title, body) {
 
     try {
         const response = await admin.messaging().send(message);
-        console.log('✅ تم إرسال الإشعار:', response);
+        console.log("✅ تم إرسال الإشعار:", response);
+        return response;
     } catch (error) {
-        console.error('❌ فشل إرسال الإشعار:', error);
+        console.error("❌ فشل إرسال الإشعار:", error);
+        throw error;
     }
 }
 
-// sendNotification('eXz4VgAGQlOXVYLXT5As5M:APA91bFSqGnJa7BmqsfaSEEvjUvi6Y2IRpLGQ12-TZ0sQSL07eKmPVKdHvikiLOPpDjvv8bzD_2rN7V3eEveqE3ef6xJkbQuczadHMY2lvjnPSWMMbwIN_A', 'عنوان الإشعار', 'نص الإشعار هنا');
+// sendNotification('d8tGkyOlRHmgZmfj2fxn2K:APA91bEMa9N755JoenfD9V_K9eelUmaC0ODSKuJiSopql5_7TmvNRIUCOGffuxF_aJTPMyI7zRnbKKpCMhNkzRQkQq1YqFt0BKA3MNVgdjcZdcJa9xyjRmw', 'عنوان الإشعار', 'نص الإشعار هنا');
 
 export const savetoken = asyncHandelr(async (req, res, next) => {
     const { userId, fcmToken } = req.body;
@@ -646,6 +649,7 @@ export const savetoken = asyncHandelr(async (req, res, next) => {
         return res.status(400).json({ message: "userId و fcmToken مطلوبين" });
     }
 
+    
     try {
         await Usermodel.findByIdAndUpdate(userId, { fcmToken });
         res.json({ message: "تم حفظ التوكن بنجاح" });
