@@ -720,6 +720,18 @@ export const signup = asyncHandelr(async (req, res, next) => {
 });
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 export const getAllUsers = asyncHandelr(async (req, res) => {
     const currentUser = await Usermodel.findById(req.user._id).select("friends");
 

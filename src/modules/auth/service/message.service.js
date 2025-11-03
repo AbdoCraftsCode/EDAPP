@@ -822,35 +822,21 @@ export const handleMatching = (socket) => {
                 timers: {}
             });
 
-            // ✅ جلب بيانات المستخدمين لتحديد الصداقة
-            const [userData, matchedData] = await Promise.all([
-                Usermodel.findById(userId).select("friends"),
-                Usermodel.findById(matchedUser.userId).select("friends")
-            ]);
-
-            const isFriendForUser = userData.friends.some(
-                f => f.toString() === matchedUser.userId.toString()
-            );
-            const isFriendForOpponent = matchedData.friends.some(
-                f => f.toString() === userId.toString()
-            );
-
             const meData = {
                 id: userId,
                 name: user.username,
                 profilePic: user.profilePic,
-                score: 0,
-                isFriend: isFriendForUser // ✅ هل المستخدم الآخر صديقه
+                score: 0
             };
 
             const opponentData = {
                 id: matchedUser.userId,
                 name: matchedUser.name,
                 profilePic: matchedUser.profilePic,
-                score: 0,
-                isFriend: isFriendForOpponent // ✅ هل المستخدم الآخر صديقه
+                score: 0
             };
 
+            // ✅ إرسال بنفس شكل الـ answerResult (players array)
             const matchPayload = {
                 roomId,
                 players: [meData, opponentData],
@@ -964,7 +950,6 @@ export const handleMatching = (socket) => {
     });
 };
 
-// ✅ نفس الدوال الأصلية بدون أي حذف
 function sendQuestion(roomId) {
     const match = activeMatches.get(roomId);
     if (!match) return;
