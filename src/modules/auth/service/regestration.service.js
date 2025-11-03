@@ -754,6 +754,56 @@ export const getAllUsers = asyncHandelr(async (req, res) => {
 
 
 
+
+export const getPendingChallenges = asyncHandelr(async (req, res, next) => {
+    // ✅ استخراج ID المستخدم من التوكن
+    const userId = req.user._id;
+
+    // ✅ جلب الدعوات اللي اتبعتت له ولسه في الانتظار
+    const challenges = await ChallengeModel.find({
+        receiverId: userId,
+        status: "pending", // أو "waiting" حسب عندك في قاعدة البيانات
+    })
+        .populate("senderId", "username profilePic gender className") // بيانات المرسل
+        .sort({ createdAt: -1 });
+
+    if (!challenges.length) {
+        return successresponse(res, {
+            message: "🎯 لا توجد دعوات جديدة حالياً",
+            challenges: [],
+        });
+    }
+
+    // ✅ تجهيز الرد النهائي
+    return successresponse(res, {
+        count: challenges.length,
+        challenges: challenges.map((ch) => ({
+            id: ch._id,
+            from: {
+                id: ch.senderId._id,
+                name: ch.senderId.username,
+                pic: ch.senderId.profilePic,
+                gender: ch.senderId.gender,
+                className: ch.senderId.className,
+            },
+            status: ch.status,
+            createdAt: ch.createdAt,
+        })),
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
 export const updateProfile = asyncHandelr(async (req, res, next) => {
     const { watchingplan, Downloadsplan, isPromoter } = req.body;
 
@@ -781,6 +831,10 @@ export const updateProfile = asyncHandelr(async (req, res, next) => {
 
     return successresponse(res, "User profile updated successfully", 200);
 });
+
+
+
+
 
 
 
@@ -1301,6 +1355,7 @@ export const adduser = asyncHandelr(async (req, res, next) => {
 
 
 import admin from "firebase-admin";
+import { ChallengeModel } from "../../../DB/models/ChallengeSchema.js";
 
 export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
     const { friendId } = req.params;
@@ -1386,6 +1441,80 @@ export const sendFriendRequest = asyncHandelr(async (req, res, next) => {
 
 
 
+
+
+export const unfriendUser = asyncHandelr(async (req, res, next) => {
+    const { friendId } = req.params;
+
+    // 🔍 التحقق من أن المستخدم يحاول حذف نفسه
+    if (friendId === req.user._id.toString()) {
+        return next(new Error("❌ لا يمكنك إزالة نفسك من قائمة الأصدقاء", { cause: 400 }));
+    }
+
+    // 🔍 التحقق من وجود المستخدم الآخر
+    const friend = await Usermodel.findById(friendId);
+    if (!friend) return next(new Error("⚠️ المستخدم غير موجود", { cause: 404 }));
+
+    // ✅ إزالة كل طرف من قائمة أصدقاء الآخر
+    await Usermodel.findByIdAndUpdate(req.user._id, {
+        $pull: { friends: friendId }
+    });
+    await Usermodel.findByIdAndUpdate(friendId, {
+        $pull: { friends: req.user._id }
+    });
+
+    // ✅ إنشاء إشعار للمستخدم الآخر
+    const notification = await NotificationModelll.create({
+        receiverId: friendId,
+        senderId: req.user._id,
+        type: "unfriend",
+        title: "⚠️ تم إزالتك من قائمة الأصدقاء",
+        body: `${req.user.username} قام بإزالتك من قائمة أصدقائه`,
+    });
+
+    // ✅ إرسال إشعار لحظي عبر Socket.IO (لو أونلاين)
+    const io = getIo();
+    const receiverSocket = scketConnections.get(friendId);
+    if (receiverSocket) {
+        io.to(receiverSocket).emit("newNotification", {
+            id: notification._id,
+            type: notification.type,
+            title: notification.title,
+            body: notification.body,
+            sender: {
+                id: req.user._id,
+                name: req.user.username,
+                profilePic: req.user.profilePic,
+            },
+            createdAt: notification.createdAt,
+        });
+    }
+
+    // ✅ إرسال إشعار عبر Firebase Cloud Messaging (FCM)
+    if (friend.fcmToken) {
+        try {
+            await admin.messaging().send({
+                notification: {
+                    title: "⚠️ تم إزالتك من قائمة الأصدقاء",
+                    body: `${req.user.username} قام بإزالتك من قائمة أصدقائه`,
+                },
+                data: {
+                    type: "unfriend",
+                    senderId: req.user._id.toString(),
+                    receiverId: friendId.toString(),
+                    createdAt: notification.createdAt.toISOString(),
+                },
+                token: friend.fcmToken,
+            });
+
+            console.log("✅ تم إرسال إشعار FCM بإزالة الصديق بنجاح");
+        } catch (error) {
+            console.error("❌ فشل إرسال إشعار FCM:", error);
+        }
+    }
+
+    return successresponse(res, { message: "✅ تم إزالة الصديق بنجاح" });
+});
 
 
 

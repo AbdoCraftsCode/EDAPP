@@ -11,6 +11,8 @@ import examresultModel from "../../../DB/models/examresult.model.js";
 import ExamModel from "../../../DB/models/exams.model.js";
 import { getIo } from "../chat.socket.controller.js";
 import ChatModell from "../../../DB/models/chat2.model.js";
+import { ChallengeModel } from "../../../DB/models/ChallengeSchema.js";
+import { NotificationModelll } from "../../../DB/models/NotificationModelll.js";
 
 
 
@@ -893,6 +895,183 @@ export const handleMatching = (socket) => {
             socket.emit("waiting", { message: "⏳ جاري البحث عن شريك مطابق..." });
         }
     });
+
+
+    socket.on("sendChallenge", async ({ friendId }) => {
+        try {
+            const { data } = await authenticationSocket({ socket });
+            if (!data.valid) return socket.emit("socketErrorResponse", data);
+
+            const sender = data.user;
+            const receiver = await Usermodel.findById(friendId).select("username profilePic fcmToken");
+            if (!receiver) return socket.emit("socketErrorResponse", { message: "❌ المستخدم غير موجود" });
+
+            // ✅ إنشاء سجل التحدي في DB
+            const challenge = await ChallengeModel.create({
+                senderId: sender._id,
+                receiverId: receiver._id,
+                classId: sender.classId,
+                status: "pending",
+            });
+
+            // ✅ إنشاء إشعار في قاعدة البيانات
+            const notification = await NotificationModelll.create({
+                senderId: sender._id,
+                receiverId: receiver._id,
+                type: "challenge",
+                title: "🎯 تحدي جديد!",
+                body: `${sender.username} يتحداك في امتحان!`,
+            });
+
+            // ✅ إرسال إشعار فوري عبر Socket لو صديقه متصل
+            const receiverSocket = scketConnections.get(friendId);
+            const io = getIo();
+
+            if (receiverSocket) {
+                io.to(receiverSocket).emit("newChallenge", {
+                    id: challenge._id,
+                    from: {
+                        id: sender._id,
+                        username: sender.username,
+                        profilePic: sender.profilePic,
+                    },
+                    message: `${sender.username} يتحداك الآن!`,
+                });
+
+                io.to(receiverSocket).emit("newNotification", {
+                    id: notification._id,
+                    type: notification.type,
+                    title: notification.title,
+                    body: notification.body,
+                    sender: {
+                        id: sender._id,
+                        name: sender.username,
+                        profilePic: sender.profilePic,
+                    },
+                    createdAt: notification.createdAt,
+                });
+            }
+
+            // ✅ إرسال إشعار عبر Firebase Cloud Messaging (FCM)
+            if (receiver.fcmToken) {
+                try {
+                    await admin.messaging().send({
+                        notification: {
+                            title: "🎯 تحدي جديد!",
+                            body: `${sender.username} يتحداك في امتحان!`,
+                        },
+                        data: {
+                            type: "challenge",
+                            senderId: sender._id.toString(),
+                            receiverId: receiver._id.toString(),
+                            challengeId: challenge._id.toString(),
+                            createdAt: notification.createdAt.toISOString(),
+                        },
+                        token: receiver.fcmToken,
+                    });
+
+                    console.log("✅ تم إرسال إشعار FCM للتحدي بنجاح");
+                } catch (error) {
+                    console.error("❌ فشل إرسال إشعار FCM للتحدي:", error);
+                }
+            } else {
+                console.log("⚠️ المستخدم لا يملك fcmToken");
+            }
+
+            // ✅ رد المرسل
+            socket.emit("challengeSent", { message: "✅ تم إرسال التحدي بنجاح!" });
+
+        } catch (error) {
+            console.error("❌ خطأ أثناء إرسال التحدي:", error);
+            socket.emit("socketErrorResponse", { message: "حدث خطأ أثناء إرسال التحدي" });
+        }
+    });
+
+
+
+
+    socket.on("respondChallenge", async ({ challengeId, response }) => {
+        const { data } = await authenticationSocket({ socket });
+        if (!data.valid) return socket.emit("socketErrorResponse", data);
+
+        const receiver = data.user;
+        const challenge = await ChallengeModel.findById(challengeId);
+        if (!challenge) return socket.emit("socketErrorResponse", { message: "❌ التحدي غير موجود" });
+
+        if (response === "accept") {
+            challenge.status = "accepted";
+            await challenge.save();
+
+            const questions = await GeneralQuestionModel.aggregate([
+                { $match: { classId: new mongoose.Types.ObjectId(challenge.classId) } },
+                { $sample: { size: 30 } },
+                { $project: { _id: 1, question: 1, options: 1, correctAnswer: 1, mark: 1 } }
+            ]);
+
+            const roomId = `challenge-${challenge.senderId}-${challenge.receiverId}`;
+
+            const io = getIo();
+            const senderSocket = scketConnections.get(challenge.senderId.toString());
+            const receiverSocket = scketConnections.get(challenge.receiverId.toString());
+
+            // 🟢 إدخال اللاعبين في الغرفة
+            if (senderSocket) io.sockets.sockets.get(senderSocket)?.join(roomId);
+            if (receiverSocket) io.sockets.sockets.get(receiverSocket)?.join(roomId);
+
+            activeMatches.set(roomId, {
+                users: [challenge.senderId.toString(), challenge.receiverId.toString()],
+                userNames: {
+                    [challenge.senderId.toString()]: receiver.username || "لاعب 1",
+                    [challenge.receiverId.toString()]: receiver.username || "لاعب 2",
+                },
+                userPics: {
+                    [challenge.senderId.toString()]: receiver.profilePic || "",
+                    [challenge.receiverId.toString()]: receiver.profilePic || "",
+                },
+                currentQuestionIndex: 0,
+                questions,
+                scores: {
+                    [challenge.senderId]: 0,
+                    [challenge.receiverId]: 0
+                },
+                previousScores: {
+                    [challenge.senderId]: 0,
+                    [challenge.receiverId]: 0
+                },
+                answeredUsers: new Set(),
+                correctAnsweredUsers: new Set(),
+                questionStartTime: Date.now(),
+                timers: {}
+            });
+
+
+            sendToBoth(roomId, "matchFound", {
+                roomId,
+                message: "🎮 بدأ التحدي الآن!",
+                players: [
+                    { id: challenge.senderId, score: 0 },
+                    { id: challenge.receiverId, score: 0 }
+                ]
+            });
+
+            // 🕑 إرسال أول سؤال بعد 2 ثانية
+            setTimeout(() => sendQuestion(roomId), 2000);
+        }
+ else {
+            challenge.status = "rejected";
+            await challenge.save();
+
+            // ❌ إشعار بالرفض
+            const senderSocket = scketConnections.get(challenge.senderId.toString());
+            if (senderSocket) {
+                const io = getIo();
+                io.to(senderSocket).emit("challengeRejected", {
+                    message: `${receiver.username} رفض التحدي 😢`
+                });
+            }
+        }
+    });
+
 
     socket.on("answerQuestion", async ({ roomId, questionId, selectedAnswer }) => {
         const match = activeMatches.get(roomId);
